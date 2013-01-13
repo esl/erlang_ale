@@ -4,7 +4,7 @@
 {application,gproc_subpub,
              [{description,"gproc-subpub - playing with pubsub using gproc"},
               {vsn,"0.0.1"},
-              {modules,[test_pubsub]},
+              {modules,[test_pubsub, sim_gpio]},
               {registered,[]},
               {applications,[kernel,stdlib,gproc]},
               {start_phases,[]}
