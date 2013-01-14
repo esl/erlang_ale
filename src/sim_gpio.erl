@@ -71,13 +71,6 @@ call_existing(Pin, Msg) ->
     end.
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
 start_link(Pin, Direction) ->
     gen_server:start_link(?MODULE, [Pin, Direction], []).
 
