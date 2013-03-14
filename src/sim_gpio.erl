@@ -147,9 +147,14 @@ handle_call({set_value, Value},
             #state{direction=input,
                    value=OldValue,
                    interrupt={both, Requestor}}=State) ->
-    Change = value_change(OldValue, Value),
-    Requestor ! {gpio_interrupt, State#state.pin, Change},
-    {reply, ok, State};
+    case value_change(OldValue, Value) of
+        no_change ->
+            io:format("no value change~n"),
+            ok;
+        _ ->
+            Requestor ! {gpio_interrupt, State#state.pin, both}
+    end,
+    {reply, ok, State#state{value=Value}};
 handle_call({set_value, Value},
             _From,
             #state{direction=input,
@@ -158,9 +163,9 @@ handle_call({set_value, Value},
     case value_change(OldValue, Value) of
         Condition ->
             Requestor ! {gpio_interrupt, State#state.pin, Condition},
-            {reply, ok, State};
+            {reply, ok, State#state{value=Value}};
         _ ->
-            {reply, ok, State}
+            {reply, ok, State#state{value=Value}}
     end;
 handle_call(get_value,
             _From,
