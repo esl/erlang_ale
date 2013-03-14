@@ -13,7 +13,8 @@
          set_int/2]).
 
 %% HW manipulation
--export([set_value/2 %% this is for input pins
+-export([set_value/2, %% this is for input pins
+         get_value/1 %% checking output pins
          ]).
 
 %% gen_server callbacks
@@ -28,6 +29,8 @@
 -type interrupt_condition() :: 'raising' | 'falling' | 'both'.
 -type pin_interrupt() :: 'no_interrupt' |
                          {interrupt_condition(), pid()}.
+
+-export_type([interrupt_condition/0]).
 
 -record(state,
         { pin                      :: pos_integer(),
@@ -62,6 +65,10 @@ set_int(Pin, Condition) ->
 set_value(Pin, Value) ->
     call_existing(Pin, {set_value, Value}).
 
+%% check what an output pin has been set to.
+get_value(Pin) ->
+    call_existing(Pin, get_value).
+
 call_existing(Pin, Msg) ->
     case gproc:lookup_local_name(pname(Pin)) of
         undefined ->
@@ -83,7 +90,8 @@ init([Pin, Direction]) ->
     {ok, #state{pin=Pin,
                 direction=Direction}}.
 
-
+handle_call(release, _From, State) ->
+    {stop, normal, ok, State};
 handle_call({write, Value}, _From, #state{direction=output}=State) ->
     Reply = ok,
     {reply, Reply, State#state{value=Value}};
@@ -153,7 +161,12 @@ handle_call({set_value, Value},
             {reply, ok, State};
         _ ->
             {reply, ok, State}
-    end.
+    end;
+handle_call(get_value,
+            _From,
+            #state{direction=output,
+                   value=Value}=State) ->
+    {reply, Value, State}.
             
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -162,6 +175,8 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
+    %% nothing to do when the process dies the gproc entry is
+    %% automatically removed.
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
