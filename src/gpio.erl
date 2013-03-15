@@ -14,6 +14,14 @@
 %% write(Pin, Value)
 %% read(Pin)
 %% set_int(Pin, Condition) - Condition = raising | falling | both.
+%%
+%% NB: when testing remember to start the gproc application first!
+
+-ifdef(simulation_mode).
+-define(GPIO_MODULE, sim_gpio).
+-else.
+-define(GPIO_MODULE, gpio_if).
+-endif.
 
 
 -behaviour(gen_server).
@@ -38,11 +46,6 @@
 
 -define(SERVER, ?MODULE). 
 
--ifdef(SIMULATION_MODE).
--define(GPIO_MODULE, sim_gpio).
--else.
--define(GPIO_MODULE, gpio_if).
--endif.
 
 -type pin_number()    :: pos_integer().
 -type pin_exclusive() :: boolean().
@@ -117,7 +120,7 @@ handle_call({pin_write, Pin, Value, Requester},
         #pin_info{direction=output,
                   owner=Owner} when Owner == none;
                                     Owner == Requester ->
-            Reply = sim_gpio:write(Pin, Value),
+            Reply = ?GPIO_MODULE:write(Pin, Value),
             {reply, Reply, State};
         #pin_info{} ->
             Reply = {error, not_an_output_pin},
@@ -131,7 +134,7 @@ handle_call({pin_read, Pin},
             #state{pins=Pins}=State) ->
     case lists:keyfind(Pin, #pin_info.number, Pins) of
         #pin_info{direction=input} ->
-            Reply = sim_gpio:read(Pin),
+            Reply = ?GPIO_MODULE:read(Pin),
             {reply, Reply, State};
         #pin_info{} ->
             Reply = {error, not_an_input_pin},
@@ -145,7 +148,7 @@ handle_call({pin_set_int, Pin, Condition, Requester},
             #state{pins=Pins}=State) ->
     case lists:keyfind(Pin, #pin_info.number, Pins) of
         #pin_info{direction=input,interrupts=none}=PinInfo->
-            case sim_gpio:set_int(Pin,Condition) of
+            case ?GPIO_MODULE:set_int(Pin,Condition) of
                 ok ->
                     NewPinInfo = PinInfo#pin_info{interrupts={Condition, [Requester]}},
                     NewPins    = lists:keystore(Pin, #pin_info.number, Pins, NewPinInfo),
@@ -176,7 +179,7 @@ pin_init(Pin, Direction, Owner, State) ->
             Reply = {error, pin_already_initialised},
             {reply, Reply, State};
         false ->
-            try sim_gpio:init(Pin, Direction) of
+            try ?GPIO_MODULE:init(Pin, Direction) of
                 {ok, _Pid} ->
                     PinInfo = #pin_info{number=Pin,
                                         direction=Direction,
