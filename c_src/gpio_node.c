@@ -20,6 +20,12 @@
  * call has to send a response back to the Pid.
  */
 
+/* gpio functions */
+ETERM* gpio_init(ETERM*, ETERM*);
+ETERM* gpio_release(ETERM*);
+
+
+/* helper functions */
 void get_hostname(char*);
 void strstrip(char * );
 
@@ -31,8 +37,7 @@ int main(int argc, char **argv) {
   unsigned char buf[BUFSIZE];              /* Buffer for incoming message */
   ErlMessage emsg;                         /* Incoming message */
 
-  ETERM *msg_type, *fromp, *tuplep, *fnp, *arg1p, *arg2p, *resp;
-  int res;
+  ETERM *msg_type, *fromp, *ref, *tuplep, *fnp, *arg1p, *arg2p, *resp;
 
   char hostname[255];
   char erlang_nodename[255] = "e1@";
@@ -63,7 +68,8 @@ int main(int argc, char **argv) {
         if (emsg.type == ERL_REG_SEND) {
            msg_type = erl_element(1, emsg.msg);
            fromp = erl_element(2, emsg.msg);
-           tuplep = erl_element(3, emsg.msg);
+           ref = erl_element(3, emsg.msg);
+           tuplep = erl_element(4, emsg.msg);
            fnp = erl_element(1, tuplep);
 
 
@@ -73,9 +79,9 @@ int main(int argc, char **argv) {
               arg1p = erl_element(2, tuplep);              
 
               if (strncmp(ERL_ATOM_PTR(fnp), "init", 4) == 0) {
+                 printf("init requested\n");
                  arg2p = erl_element(3, tuplep);
-                 /* @todo implement the real impl here */
-                 resp = erl_format("ok");
+                 resp = gpio_init(arg1p, arg2p);
               } else if (strncmp(ERL_ATOM_PTR(fnp), "write", 5) == 0) {
                     arg2p = erl_element(3, tuplep);
                     /* @todo implement the real impl here */
@@ -87,9 +93,12 @@ int main(int argc, char **argv) {
                  arg2p = erl_element(3, tuplep);
                  /* @todo implement the real impl here */
                  resp = erl_format("ok");
+              } else if (strncmp(ERL_ATOM_PTR(fnp), "release", 7) == 0) {
+                 resp = gpio_release(arg1p);
               }
 
-              erl_send(fd, fromp, resp);
+              printf("going to send resp: %s\n", ERL_ATOM_PTR(resp));
+              erl_send(fd, fromp, erl_format("{~w,~w}", ref, resp));
            } else if (strncmp(ERL_ATOM_PTR(msg_type), "cast", 4) == 0) {
               /*  cast does not expect a msg back */
            }
@@ -103,6 +112,87 @@ int main(int argc, char **argv) {
   }
 }
 
+ETERM*
+gpio_init(ETERM* pin_t, ETERM* direction_t) {
+   int pin, mode;
+   char dirname[80], pinStr[2];
+   FILE *export, *direction;
+
+   /* convert erlang terms to usable values */
+   pin = ERL_INT_VALUE(pin_t);
+   if (strncmp(ERL_ATOM_PTR(direction_t), "input", 5) == 0) {
+      mode = 0;
+   } else if (strncmp(ERL_ATOM_PTR(direction_t), "output", 5) == 0) {
+      mode = 1;
+   } else {
+      return erl_format("{error, wrong_pin_mode}");
+   }
+
+   printf("pin=%d, mode=%d\n", pin, mode);
+   
+   /* Export the pin for use. */
+
+   export = fopen("/sys/class/gpio/export", "w");
+   if (export == NULL) {
+      return erl_format("{error, unable_to_export_pin}");
+   }
+
+         
+   sprintf(pinStr, "%d", pin);
+   fwrite(pinStr, sizeof (char), strlen(pinStr), export);
+   
+   fclose(export);     
+   printf("exported pin\n");
+   
+   /* Open the direction file and write direction */
+   sprintf(dirname, "/sys/class/gpio/gpio%d/direction", pin);
+   direction = fopen(dirname, "w");
+   printf("direction for pin %d opened\n", pin);
+   
+   if (direction != NULL) {
+      if ( mode == 0) {
+         fwrite("out", sizeof (char), 3, direction);
+      } else if ( mode == 1) {
+         fwrite("in", sizeof (char), 2, direction);
+      }
+   } else {
+      return erl_format("{error, unable_to_set_pin_direction}");
+   }
+
+   fclose(direction);
+
+   printf("wrote mode %d to pin %d\n", mode, pin);
+  return erl_format("ok");         
+   
+}
+
+
+ETERM*
+gpio_release (ETERM* pin_t)
+{
+   unsigned int pin;
+   FILE *file;
+   char pinStr[3];
+
+   /* convert Erlang args to usable values */
+   pin = ERL_INT_VALUE(pin_t);
+
+   file = fopen ("/sys/class/gpio/unexport", "w");
+   if (file == NULL)
+   {
+      /* debug ("[%s] Can't open file (unexport)\n", __func__); */
+      return erl_format("{error, cannot_open_file_for_unexport}");
+   }
+
+   sprintf (pinStr, "%d", pin);
+   fwrite (pinStr, sizeof (char), strlen (pinStr), file);
+   
+   fclose (file);
+  
+   return erl_format("ok");
+}
+
+              
 void
 get_hostname(char* name)
 {

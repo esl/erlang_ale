@@ -113,6 +113,15 @@ handle_call({pin_init_output, Pin, Owner}, _From, State) ->
     %% @todo should refactor this so non_exclusive_pin_init code is
     %% reused.
     pin_init(Pin, output, Owner, State);
+handle_call({pin_release, Pin}, _From, State) ->
+    case lists:keytake(Pin, #pin_info.number, State#state.pins) of
+        {value, #pin_info{}, NewPins} ->
+            Reply = ?GPIO_MODULE:release(Pin),
+            {reply, Reply, State#state{pins=NewPins}};
+        false ->
+            Reply = {error, release_of_uninitialised_pin},
+            {reply, Reply, State}
+    end;
 handle_call({pin_write, Pin, Value, Requester},
             _From,
             State) ->

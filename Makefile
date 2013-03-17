@@ -1,6 +1,18 @@
 
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Darwin)
 ERL_LIB=/usr/local/lib/erlang/lib/erl_interface-3.7.9
 CFLAGS=-Wall -I/usr/local/include -I$(ERL_LIB)/include
+endif
+
+ifeq ($(UNAME), Linux)
+ERL_LIB=/usr/lib/erlang/lib/erl_interface-3.7.9
+CFLAGS=-Wall -I/usr/local/include -I$(ERL_LIB)/include
+endif
+
+
+
 LDFLAGS=-L. -L$(ERL_LIB)/lib 
 
 
@@ -17,7 +29,7 @@ test: test/gpio_SUITE.erl
 	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test
 
 
-gpio_port: priv/gpio_node.o
+gpio_node: priv/gpio_node.o
 	gcc ${LDFLAGS} $< -lerl_interface -lei -lpthread -o $@
 
 priv/%.o: c_src/%.c
