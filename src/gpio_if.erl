@@ -105,9 +105,12 @@ init([Pin, Direction]) ->
 
 handle_call(release, _From, State) ->
     {stop, normal, ok, State};
-handle_call({write, Value}, _From, #state{direction=output}=State) ->
-    Reply = ok,
-    {reply, Reply, State};
+handle_call({write, Value}, From, #state{pin=Pin,
+                                          direction=output,
+                                          pending=Pending}=State) ->
+    call_to_node(State, From, {write, Pin, Value}),
+    NewPending = [From | Pending],
+    {noreply,  State#state{pending=NewPending}};
 handle_call({write, _Value}, _From, #state{direction=input}=State) ->
     %% @todo: check with Ömer what the behaviour should be here
     Reply = {error, writing_to_input_pin},
@@ -141,8 +144,12 @@ handle_call({set_int, _Condition, _Requestor},
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info({To, Msg}, #state{pending=Pending}=State) ->
+    %% @todo: should we do something if To is not in Pending list?
+    io:format("Got a reply to a pending message {~p, ~p}", [To, Msg]),
+    NewPending = lists:delete(To, Pending),
+    gen_server:reply(To, Msg),
+    {noreply, State#state{pending=NewPending}}.
 
 terminate(_Reason, #state{pin=Pin}=State) ->
     %% the gproc entry is automatically removed.
@@ -187,7 +194,7 @@ sync_call_to_node(State, Msg) ->
 
 %% the response to this call has to be handled in the handle_info function.
 call_to_node(State, From, Msg) ->
-    send_to_cnode(State, {call, self, From, Msg}).
+    send_to_cnode(State, {call, self(), From, Msg}).
 
 nodename() ->
     {ok, Hostname} = inet:gethostname(),

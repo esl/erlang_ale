@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
+#include <inttypes.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -23,9 +26,11 @@
 /* gpio functions */
 ETERM* gpio_init(ETERM*, ETERM*);
 ETERM* gpio_release(ETERM*);
-
+ETERM* gpio_write(ETERM*, ETERM*);
 
 /* helper functions */
+
+static int gpio_valfd (int);
 void get_hostname(char*);
 void strstrip(char * );
 
@@ -85,7 +90,7 @@ int main(int argc, char **argv) {
               } else if (strncmp(ERL_ATOM_PTR(fnp), "write", 5) == 0) {
                     arg2p = erl_element(3, tuplep);
                     /* @todo implement the real impl here */
-                    resp = erl_format("ok");
+                    resp = gpio_write(arg1p, arg2p);
               } else if (strncmp(ERL_ATOM_PTR(fnp), "read", 4) == 0) {
                  /* @todo implement the real impl here */
                  resp = erl_format("ok");
@@ -104,7 +109,8 @@ int main(int argc, char **argv) {
            }
            
 	erl_free_term(emsg.from); erl_free_term(emsg.msg);
-	erl_free_term(fromp); erl_free_term(tuplep);
+	erl_free_term(fromp); erl_free_term(ref);
+        erl_free_term(tuplep);
 	erl_free_term(fnp); erl_free_term(arg1p);
 	erl_free_term(arg2p); erl_free_term(resp);
       }
@@ -191,6 +197,66 @@ gpio_release (ETERM* pin_t)
   
    return erl_format("ok");
 }
+
+ETERM*
+gpio_write(ETERM* pin_t, ETERM* value_t) {
+   unsigned int pin;
+   unsigned int val;
+   FILE *file;
+   char filename[35];
+
+   
+   pin = ERL_INT_VALUE(pin_t);
+   val = ERL_INT_VALUE(value_t);
+
+   sprintf (filename, "/sys/class/gpio/gpio%d/value", pin);
+
+   file = fopen (filename, "w");
+
+   if ( file == NULL ) {
+      return erl_format("{error, unable_to_open_value_file}");
+   }
+
+   /* @todo: should change this to a switch statement */
+   if ( val == 0 ){
+      if ( fwrite ("0", sizeof(char), 1, file) != 1 ){
+         return erl_format("{error, cannot_write_to_gpio_pin}");
+      }
+   } else if ( val == 1 ){
+      if ( fwrite ("1", sizeof(char), 1, file) != 1 ){
+         return erl_format("{error, cannot_write_to_gpio_pin}");
+      }
+   } else {
+      return erl_format("{error, wrong_value_for_gpio_pin}");
+   }
+
+   fclose (file);
+
+   return erl_format("ok");
+}   
+   
+
+
+static int
+gpio_valfd (int pin)
+{
+  int file;
+  char filename[35];
+
+  sprintf (filename, "/sys/class/gpio/gpio%d/value", pin);
+  file = open (filename, O_RDWR | O_NONBLOCK);
+  if (file < 0)
+    {
+      /* debug ("[%s] Can't open file (value): %s\n", __func__, filename); */
+      return -1;
+    }
+  else
+    {
+      return file;
+    }
+
+}
+
 
               
 void
