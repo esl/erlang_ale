@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -27,6 +28,7 @@
 ETERM* gpio_init(ETERM*, ETERM*);
 ETERM* gpio_release(ETERM*);
 ETERM* gpio_write(ETERM*, ETERM*);
+ETERM* gpio_read(ETERM*);
 
 /* helper functions */
 
@@ -92,8 +94,7 @@ int main(int argc, char **argv) {
                     /* @todo implement the real impl here */
                     resp = gpio_write(arg1p, arg2p);
               } else if (strncmp(ERL_ATOM_PTR(fnp), "read", 4) == 0) {
-                 /* @todo implement the real impl here */
-                 resp = erl_format("ok");
+                 resp = gpio_read(arg1p);
               } else if (strncmp(ERL_ATOM_PTR(fnp), "set_int", 7) == 0) {
                  arg2p = erl_element(3, tuplep);
                  /* @todo implement the real impl here */
@@ -252,7 +253,37 @@ gpio_write(ETERM* pin_t, ETERM* value_t) {
    
    return erl_format("ok");
 }   
+
+ETERM*
+gpio_read(ETERM* pin_t) {
+
+     unsigned int pin;
+   unsigned int val;
+   FILE *file;
+   /* int file; */
+   char filename[35];
+   char str_val[2];
+
+   pin = ERL_INT_VALUE(pin_t);
+
+   sprintf (filename, "/sys/class/gpio/gpio%d/value", pin);
+
+   file = fopen (filename, "r");
+
+   if ( file == NULL ) {
+      return erl_format("{error, unable_to_open_value_file}");
+   }
+
+   if ( fread(str_val, sizeof(char), 1, file) != 1 ){
+         return erl_format("{error, unable_to_read_value_file}");
+      }
+
+   val = atoi(str_val);
+
+   fclose(file);
    
+   return erl_format("~i",val);
+}
 
 
 static int
