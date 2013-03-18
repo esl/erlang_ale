@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <poll.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -14,14 +17,29 @@
 
 #define BUFSIZE 1000
 
+static pthread_t isr_handler_thread;
+static int isr_handler_flag;
+static int fd_erlang_node;
+
+
+typedef struct {
+   ETERM* pinp;
+   void (*isr) (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep);
+   ETERM* pidp;
+   ETERM* refp;
+   ETERM* modep;
+} isr_t;
+
 /* this node will be known as c1@<hostname> */
 
 
 
 /* the erlang node will send messages using this format:
- * {call, Pid, Msg}
+ * {call, Pid, Ref, Msg}
  * (others might be added later)
- * call has to send a response back to the Pid.
+ * call has to send a response back to the Pid and it tags the
+ * response with the unique reference Ref sent to it as part of the
+ * call message.
  */
 
 /* gpio functions */
@@ -29,6 +47,14 @@ ETERM* gpio_init(ETERM*, ETERM*);
 ETERM* gpio_release(ETERM*);
 ETERM* gpio_write(ETERM*, ETERM*);
 ETERM* gpio_read(ETERM*);
+ETERM*
+gpio_set_int (ETERM* pinp, ETERM* pidp, ETERM* refp,
+              void (*isr) (ETERM*, ETERM*, ETERM*, ETERM*), ETERM* modep);
+
+
+void
+handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep);
+static int gpio_edge (int, char* );
 
 /* helper functions */
 
@@ -36,87 +62,89 @@ static int gpio_valfd (int);
 void get_hostname(char*);
 void strstrip(char * );
 
-int main(int argc, char **argv) {
-  int fd;                                  /* fd to Erlang node */
+int
+main(int argc, char **argv) {
+   /* int fd;                                  /\* fd to Erlang node *\/ */
 
-  int loop = 1;                            /* Loop flag */
-  int got;                                 /* Result of receive */
-  unsigned char buf[BUFSIZE];              /* Buffer for incoming message */
-  ErlMessage emsg;                         /* Incoming message */
+   int loop = 1;                            /* Loop flag */
+   int got;                                 /* Result of receive */
+   unsigned char buf[BUFSIZE];              /* Buffer for incoming message */
+   ErlMessage emsg;                         /* Incoming message */
 
-  ETERM *msg_type, *fromp, *ref, *tuplep, *fnp, *arg1p, *arg2p, *resp;
+   ETERM *msg_type, *fromp, *refp, *tuplep, *fnp, *arg1p, *arg2p, *resp;
 
-  char hostname[255];
-  char erlang_nodename[255] = "e1@";
+   char hostname[255];
+   char erlang_nodename[255] = "e1@";
   
-  erl_init(NULL, 0);
+   erl_init(NULL, 0);
 
-  if (erl_connect_init(1, "secretcookie", 0) == -1)
-    erl_err_quit("erl_connect_init");
+   if (erl_connect_init(1, "secretcookie", 0) == -1)
+      erl_err_quit("erl_connect_init");
 
-  /* now we figure out where to connect to */
-  get_hostname(hostname);
-  strcat(erlang_nodename, hostname);
-  strstrip(erlang_nodename);
+   /* now we figure out where to connect to */
+   get_hostname(hostname);
+   strcat(erlang_nodename, hostname);
+   strstrip(erlang_nodename);
   
-  if ((fd = erl_connect(erlang_nodename)) < 0)
-    erl_err_quit("erl_connect");
-  fprintf(stderr, "Connected to %s\n\r",erlang_nodename);
+   if ((fd_erlang_node = erl_connect(erlang_nodename)) < 0)
+      erl_err_quit("erl_connect");
+   fprintf(stderr, "Connected to %s\n\r",erlang_nodename);
 
-  while (loop) {
+   while (loop) {
 
-     got = erl_receive_msg(fd, buf, BUFSIZE, &emsg);
-     if (got == ERL_TICK) {
-        /* ignore */
-     } else if (got == ERL_ERROR) {
-        loop = 0;
-     } else {
+      got = erl_receive_msg(fd_erlang_node, buf, BUFSIZE, &emsg);
+      if (got == ERL_TICK) {
+         /* ignore */
+      } else if (got == ERL_ERROR) {
+         loop = 0;
+      } else {
         
-        if (emsg.type == ERL_REG_SEND) {
-           msg_type = erl_element(1, emsg.msg);
-           fromp = erl_element(2, emsg.msg);
-           ref = erl_element(3, emsg.msg);
-           tuplep = erl_element(4, emsg.msg);
-           fnp = erl_element(1, tuplep);
+         if (emsg.type == ERL_REG_SEND) {
+            msg_type = erl_element(1, emsg.msg);
+            fromp = erl_element(2, emsg.msg);
+            refp = erl_element(3, emsg.msg);
+            tuplep = erl_element(4, emsg.msg);
+            fnp = erl_element(1, tuplep);
 
 
-           if (strncmp(ERL_ATOM_PTR(msg_type), "call", 4) == 0) {
-              /* call expects a msg back */
-              /* always at least one argument so we get that out first*/
-              arg1p = erl_element(2, tuplep);              
+            if (strncmp(ERL_ATOM_PTR(msg_type), "call", 4) == 0) {
+               /* call expects a msg back */
+               /* always at least one argument so we get that out first*/
+               arg1p = erl_element(2, tuplep);              
 
-              if (strncmp(ERL_ATOM_PTR(fnp), "init", 4) == 0) {
-                 printf("init requested\n");
-                 arg2p = erl_element(3, tuplep);
-                 resp = gpio_init(arg1p, arg2p);
-              } else if (strncmp(ERL_ATOM_PTR(fnp), "write", 5) == 0) {
-                    arg2p = erl_element(3, tuplep);
-                    /* @todo implement the real impl here */
-                    resp = gpio_write(arg1p, arg2p);
-              } else if (strncmp(ERL_ATOM_PTR(fnp), "read", 4) == 0) {
-                 resp = gpio_read(arg1p);
-              } else if (strncmp(ERL_ATOM_PTR(fnp), "set_int", 7) == 0) {
-                 arg2p = erl_element(3, tuplep);
-                 /* @todo implement the real impl here */
-                 resp = erl_format("ok");
-              } else if (strncmp(ERL_ATOM_PTR(fnp), "release", 7) == 0) {
-                 resp = gpio_release(arg1p);
-              }
+               if (strncmp(ERL_ATOM_PTR(fnp), "init", 4) == 0) {
+                  printf("init requested\n");
+                  arg2p = erl_element(3, tuplep);
+                  resp = gpio_init(arg1p, arg2p);
+               } else if (strncmp(ERL_ATOM_PTR(fnp), "write", 5) == 0) {
+                  arg2p = erl_element(3, tuplep);
+                  /* @todo implement the real impl here */
+                  resp = gpio_write(arg1p, arg2p);
+               } else if (strncmp(ERL_ATOM_PTR(fnp), "read", 4) == 0) {
+                  resp = gpio_read(arg1p);
+               } else if (strncmp(ERL_ATOM_PTR(fnp), "set_int", 7) == 0) {
+                  arg2p = erl_element(3, tuplep);
+                  /* @todo implement the real impl here */
+                  resp = gpio_set_int(arg1p, fromp, refp,
+                                      handle_gpio_interrupt, arg2p);
+               } else if (strncmp(ERL_ATOM_PTR(fnp), "release", 7) == 0) {
+                  resp = gpio_release(arg1p);
+               }
 
-              printf("going to send resp: %s\n", ERL_ATOM_PTR(resp));
-              erl_send(fd, fromp, erl_format("{~w,~w}", ref, resp));
-           } else if (strncmp(ERL_ATOM_PTR(msg_type), "cast", 4) == 0) {
-              /*  cast does not expect a msg back */
-           }
+               printf("going to send resp: %s\n", ERL_ATOM_PTR(resp));
+               erl_send(fd_erlang_node, fromp, erl_format("{~w,~w}", refp, resp));
+            } else if (strncmp(ERL_ATOM_PTR(msg_type), "cast", 4) == 0) {
+               /*  cast does not expect a msg back */
+            }
            
-	erl_free_term(emsg.from); erl_free_term(emsg.msg);
-	erl_free_term(fromp); erl_free_term(ref);
-        erl_free_term(tuplep);
-	erl_free_term(fnp); erl_free_term(arg1p);
-	erl_free_term(arg2p); erl_free_term(resp);
+            erl_free_term(emsg.from); erl_free_term(emsg.msg);
+            erl_free_term(fromp); erl_free_term(refp);
+            erl_free_term(tuplep);
+            erl_free_term(fnp); erl_free_term(arg1p);
+            erl_free_term(arg2p); erl_free_term(resp);
+         }
       }
-    }
-  }
+   }
 }
 
 ETERM*
@@ -169,7 +197,7 @@ gpio_init(ETERM* pin_t, ETERM* direction_t) {
    fclose(direction);
 
    printf("wrote mode %d to pin %d\n", mode, pin);
-  return erl_format("ok");         
+   return erl_format("ok");         
    
 }
 
@@ -229,8 +257,8 @@ gpio_write(ETERM* pin_t, ETERM* value_t) {
    snprintf (str_val, (2*sizeof(char)), "%d", val);
 
    if ( fwrite (str_val, sizeof(char), 2, file) != 2 ){
-         return erl_format("{error, cannot_write_to_gpio_pin}");
-      }
+      return erl_format("{error, cannot_write_to_gpio_pin}");
+   }
   
    fclose (file);
 
@@ -257,7 +285,7 @@ gpio_write(ETERM* pin_t, ETERM* value_t) {
 ETERM*
 gpio_read(ETERM* pin_t) {
 
-     unsigned int pin;
+   unsigned int pin;
    unsigned int val;
    FILE *file;
    /* int file; */
@@ -275,8 +303,8 @@ gpio_read(ETERM* pin_t) {
    }
 
    if ( fread(str_val, sizeof(char), 1, file) != 1 ){
-         return erl_format("{error, unable_to_read_value_file}");
-      }
+      return erl_format("{error, unable_to_read_value_file}");
+   }
 
    val = atoi(str_val);
 
@@ -286,23 +314,188 @@ gpio_read(ETERM* pin_t) {
 }
 
 
+
+static int
+gpio_edge (int pin, char *edge) {
+   FILE *file;
+   char filename[35];
+
+   sprintf (filename, "/sys/class/gpio/gpio%d/edge", pin);
+   file = fopen (filename, "w");
+   if (file == NULL)
+   {
+      /* debug ("[%s] Can't open file (edge): %s\n", __func__, filename); */
+      return -1;
+   }
+   fwrite (edge, sizeof (char), strlen (edge) + 1, file);
+              
+   fclose (file);
+              
+   return 1;
+}
+
+
+void
+handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep) {
+   /* @TODO: how to get the interrupt condition in the message? */
+   ETERM* resp = erl_format("{gpio_interrupt, ~w, ~w}", pinp, modep);
+
+   erl_send(fd_erlang_node, pidp, erl_format("{~w, ~w}", refp, resp));
+
+   /* @TODO is this where we should free the memory? */
+
+   erl_free_term(pinp);
+   erl_free_term(pidp);
+   erl_free_term(refp);
+   erl_free_term(modep);
+
+}
+
+/* taken from https://github.com/omerk/pihwm/blob/master/lib/pi_gpio.c */              
+static void *
+isr_handler (void *isr) {
+   struct pollfd fdset[2];
+   int nfds = 2, gpio_fd, rc;
+   char *buf[64];
+
+   isr_t i = *(isr_t *) isr;
+
+   if (isr_handler_flag)
+   {
+      printf ("isr_handler running\n");
+
+      /* Get /value fd
+         TODO: Add check here */
+      gpio_fd = gpio_valfd ((int) i.pinp);
+
+
+      while (1)
+      {
+         memset ((void *) fdset, 0, sizeof (fdset));
+
+         fdset[0].fd = STDIN_FILENO;
+         fdset[0].events = POLLIN;
+
+         fdset[1].fd = gpio_fd;
+         fdset[1].events = POLLPRI;
+
+         rc = poll (fdset, nfds, 1000);	/* Timeout in ms */
+
+         if (rc < 0)
+         {
+/* debug ("\npoll() failed!\n"); */
+            return (void *) -1;
+         }
+
+         if (rc == 0)
+         {
+/* debug ("poll() timeout.\n"); */
+            if (isr_handler_flag == 0)
+            {
+/* debug ("exiting isr_handler (timeout)"); */
+               pthread_exit (NULL);
+            }
+         }
+
+         if (fdset[1].revents & POLLPRI)
+         {
+/* We have an interrupt! */
+            if (-1 == read (fdset[1].fd, buf, 64))
+            {
+/* debug ("read failed for interrupt"); */
+               return (void *) -1;
+            }
+
+            (*i.isr) (i.pinp, i.pidp, i.refp, i.modep);	/* Call the ISR */
+         }
+
+         if (fdset[0].revents & POLLIN)
+         {
+            if (-1 == read (fdset[0].fd, buf, 1))
+            {
+/* debug ("read failed for stdin read"); */
+               return (void *) -1;
+            }
+
+            printf ("\npoll() stdin read 0x%2.2X\n", (unsigned int) buf[0]);
+         }
+
+         fflush (stdout);
+      }
+   }
+   else
+   {
+      /* debug ("exiting isr_handler (flag)"); */
+      pthread_exit (NULL);
+   }
+
+}
+
+
+ETERM*
+gpio_set_int (ETERM* pinp, ETERM* pidp, ETERM* refp,
+              void (*isr) (ETERM*, ETERM*, ETERM*, ETERM*), ETERM* modep)
+{
+  /* Details of the ISR */
+  isr_t *i = (isr_t *) malloc (sizeof (isr_t));
+  i->pinp = erl_format("~w",pinp);
+  i->isr = isr;
+  i->pidp = erl_format("~w", pidp);
+  i->refp = erl_format("~w", refp);
+  i->modep = erl_format("~w", modep);
+  char mode[10];
+  unsigned int pin;
+  
+  sprintf(mode, "%s", ERL_ATOM_PTR(modep));
+  pin = ERL_INT_VALUE(pinp);
+  
+  /* Set up interrupt */
+  if ( gpio_edge (pin, mode) == -1) {
+     return erl_format("{error, unable_to_set_gpio_edge}");
+  }
+
+  /* Set isr_handler flag and create thread
+TODO: check for errors using retval */
+  isr_handler_flag = 1;
+  pthread_create (&isr_handler_thread, NULL, isr_handler, (void *) i);
+  pthread_tryjoin_np (isr_handler_thread, NULL);
+
+  return erl_format("ok");
+}
+
+
+int
+gpio_clear_int (unsigned int pin)
+{
+  /* this will terminate isr_handler thread */
+  isr_handler_flag = 0;
+
+  /* TODO: Reset "edge", release pin? */
+  return 0;	/* Is this a correct return result. */
+}
+
+
+
+
+
+              
 static int
 gpio_valfd (int pin)
 {
-  int file;
-  char filename[35];
+   int file;
+   char filename[35];
 
-  sprintf (filename, "/sys/class/gpio/gpio%d/value", pin);
-  file = open (filename, O_RDWR | O_NONBLOCK);
-  if (file < 0)
-    {
+   sprintf (filename, "/sys/class/gpio/gpio%d/value", pin);
+   file = open (filename, O_RDWR | O_NONBLOCK);
+   if (file < 0)
+   {
       /* debug ("[%s] Can't open file (value): %s\n", __func__, filename); */
       return -1;
-    }
-  else
-    {
+   }
+   else
+   {
       return file;
-    }
+   }
 
 }
 
@@ -321,45 +514,46 @@ get_hostname(char* name)
 
 }
 
-void  strstrip( char *s )
+void
+strstrip( char *s )
 {
-  char *start;
-  char *end;
+   char *start;
+   char *end;
 
-  // Exit if param is NULL pointer
-  if (s == NULL)
-    return;
+   // Exit if param is NULL pointer
+   if (s == NULL)
+      return;
 
-  // Skip over leading whitespace
-  start = s;
-  while ((*start) && isspace(*start))
-    start++;      
+   // Skip over leading whitespace
+   start = s;
+   while ((*start) && isspace(*start))
+      start++;      
 
-  // Is string just whitespace?
-  if (!(*start)) 
-  {         
-    *s = 0x00; // Truncate entire string
-    return;     
-  }     
+   // Is string just whitespace?
+   if (!(*start)) 
+   {         
+      *s = 0x00; // Truncate entire string
+      return;     
+   }     
 
-  // Find end of string
-  end = start;
-  while (*end)         
-    end++;     
+   // Find end of string
+   end = start;
+   while (*end)         
+      end++;     
 
-  // Step back from NUL
-  end--;      
+   // Step back from NUL
+   end--;      
 
-  // Step backward until first non-whitespace
-  while ((end != start) && isspace(*end))         
-    end--;     
+   // Step backward until first non-whitespace
+   while ((end != start) && isspace(*end))         
+      end--;     
 
-  // Chop off trailing whitespace
-  *(end + 1) = 0x00;
+   // Chop off trailing whitespace
+   *(end + 1) = 0x00;
 
-  // If had leading whitespace, then move entire string back to beginning
-  if (s != start)
-    memmove(s, start, end-start+1);      
+   // If had leading whitespace, then move entire string back to beginning
+   if (s != start)
+      memmove(s, start, end-start+1);      
 
-  return; 
+   return; 
 } 
