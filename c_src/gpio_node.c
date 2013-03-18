@@ -157,9 +157,9 @@ gpio_init(ETERM* pin_t, ETERM* direction_t) {
    
    if (direction != NULL) {
       if ( mode == 0) {
-         fwrite("out", sizeof (char), 3, direction);
+         fwrite("in", sizeof (char), 3, direction);
       } else if ( mode == 1) {
-         fwrite("in", sizeof (char), 2, direction);
+         fwrite("out", sizeof (char), 4, direction);
       }
    } else {
       return erl_format("{error, unable_to_set_pin_direction}");
@@ -203,7 +203,9 @@ gpio_write(ETERM* pin_t, ETERM* value_t) {
    unsigned int pin;
    unsigned int val;
    FILE *file;
+   /* int file; */
    char filename[35];
+   char str_val[2];
 
    
    pin = ERL_INT_VALUE(pin_t);
@@ -217,21 +219,37 @@ gpio_write(ETERM* pin_t, ETERM* value_t) {
       return erl_format("{error, unable_to_open_value_file}");
    }
 
-   /* @todo: should change this to a switch statement */
-   if ( val == 0 ){
-      if ( fwrite ("0", sizeof(char), 1, file) != 1 ){
-         return erl_format("{error, cannot_write_to_gpio_pin}");
-      }
-   } else if ( val == 1 ){
-      if ( fwrite ("1", sizeof(char), 1, file) != 1 ){
-         return erl_format("{error, cannot_write_to_gpio_pin}");
-      }
-   } else {
+   if ((val!=0)&&(val!=1))
+   {
+      fprintf(stderr, "ERROR: Invalid value!\nValue must be 0 or 1\n");
       return erl_format("{error, wrong_value_for_gpio_pin}");
    }
 
+   snprintf (str_val, (2*sizeof(char)), "%d", val);
+
+   if ( fwrite (str_val, sizeof(char), 2, file) != 2 ){
+         return erl_format("{error, cannot_write_to_gpio_pin}");
+      }
+  
    fclose (file);
 
+   /* if ( (file = gpio_valfd(pin)) == -1)  */
+   /*    return erl_format("{error, unable_to_open_value_file}"); */
+   
+   /* if ( val == 0) { */
+   /*    if ( write(file, "0", (sizeof(char)*(1+1))) == -1 ) { */
+   /*       return erl_format("{error, cannot_write_to_gpio_pin}"); */
+   /*    } */
+   /* } else if ( val == 1 ) { */
+   /*    if ( write(file, "1", (sizeof(char)*(1+1))) == -1) { */
+   /*          return erl_format("{error, cannot_write_to_gpio_pin}"); */
+   /*    } */
+   /* } else {    */
+   /*    return erl_format("{error, wrong_value_for_gpio_pin}"); */
+   /* } */
+
+   /* close(file); */
+   
    return erl_format("ok");
 }   
    
