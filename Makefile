@@ -22,8 +22,11 @@ build:
 build_sim:
 	rebar -D simulation_mode  compile
 
+build_examples:
+	erlc -o examples examples/*.erl
+
 shell: 
-	erl  -sname e1 -setcookie secretcookie -pz deps/*/ebin -pz ebin
+	erl  -sname e1 -setcookie secretcookie -pz deps/*/ebin -pz ebin -pz examples
 
 test: test/gpio_SUITE.erl
 	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test

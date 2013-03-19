@@ -1,0 +1,2 @@
+#!/bin/bash
+cd ..; rsync -avz --exclude '.git/*' --exclude 'erlhw/logs/*' --exclude 'erlhw/deps/*/logs/*' --exclude 'erlhw/priv/*' --exclude 'erlhw/ebin/*' --exclude '*.beam' erlhw /Users/th/RaspiBox/
