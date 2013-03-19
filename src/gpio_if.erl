@@ -125,11 +125,15 @@ handle_call(read, _From, #state{direction=output}=State) ->
     Reply = {error, reading_from_output_pin},
     {reply, Reply, State};
 handle_call({set_int, Condition, Requestor},
-            _From,
+            From,
             #state{direction=input,
-                   interrupt=no_interrupt}=State) ->
-    Reply = ok,
-    {reply, Reply, State#state{interrupt={Condition, Requestor}}};
+                   interrupt=no_interrupt,
+                   pin=Pin,
+                   pending=Pending}=State) ->
+    call_to_node(State, From, {set_int, Pin, Condition}),
+    NewPending = [From | Pending],
+    {noreply, State#state{interrupt={Condition, Requestor},
+                          pending=NewPending}};
 handle_call({set_int, Condition, Requestor},
             _From,
             #state{direction=input,
@@ -147,9 +151,16 @@ handle_call({set_int, _Condition, _Requestor},
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+
+handle_info({gpio_interrupt, Pin, Condition}=Msg,
+            #state{pin=Pin,
+                   interrupt={Condition, Pid}}=State) ->
+    Pid ! Msg,
+    {noreply, State};
 handle_info({To, Msg}, #state{pending=Pending}=State) ->
     %% @todo: should we do something if To is not in Pending list?
-    %% io:format("Got a reply to a pending message {~p, ~p}", [To, Msg]),
+    io:format("gpio_if:handle_info - Got a reply to a pending message {~p, ~p}~n",
+              [To, Msg]),
     NewPending = lists:delete(To, Pending),
     gen_server:reply(To, Msg),
     {noreply, State#state{pending=NewPending}}.

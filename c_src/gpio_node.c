@@ -17,6 +17,14 @@
 
 #define BUFSIZE 1000
 
+#define DEBUG 1
+
+#ifdef DEBUG
+#define debug(...) printf(__VA_ARGS__)
+#else
+#define debug(...) ;
+#endif
+
 static pthread_t isr_handler_thread;
 static int isr_handler_flag;
 static int fd_erlang_node;
@@ -324,7 +332,7 @@ gpio_edge (int pin, char *edge) {
    file = fopen (filename, "w");
    if (file == NULL)
    {
-      /* debug ("[%s] Can't open file (edge): %s\n", __func__, filename); */
+      debug ("[%s] Can't open file (edge): %s\n", __func__, filename); 
       return -1;
    }
    fwrite (edge, sizeof (char), strlen (edge) + 1, file);
@@ -337,11 +345,16 @@ gpio_edge (int pin, char *edge) {
 
 void
 handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep) {
-   /* @TODO: how to get the interrupt condition in the message? */
+   debug("inside handle_gpio_interrupt\n\r");
+   debug("pin: %d, pid_number: %d, mode: %s\n\r",
+         ERL_INT_VALUE(pinp), ERL_PID_NUMBER(pidp), ERL_ATOM_PTR(modep));
+   
    ETERM* resp = erl_format("{gpio_interrupt, ~w, ~w}", pinp, modep);
 
-   erl_send(fd_erlang_node, pidp, erl_format("{~w, ~w}", refp, resp));
+   /* erl_send(fd_erlang_node, pidp, erl_format("{~w, ~w}", refp, resp)); */
+   erl_send(fd_erlang_node, pidp, resp);
 
+   
    /* @TODO is this where we should free the memory? */
 
    erl_free_term(pinp);
@@ -366,8 +379,12 @@ isr_handler (void *isr) {
 
       /* Get /value fd
          TODO: Add check here */
-      gpio_fd = gpio_valfd ((int) i.pinp);
+      gpio_fd = gpio_valfd (ERL_INT_VALUE(i.pinp));
 
+      if ( gpio_fd == -1) {
+         fprintf(stderr, "Unable to open gpio fd\n\r");
+         return NULL;
+      }
 
       while (1)
       {
@@ -383,16 +400,16 @@ isr_handler (void *isr) {
 
          if (rc < 0)
          {
-/* debug ("\npoll() failed!\n"); */
+            debug ("\npoll() failed!\n"); 
             return (void *) -1;
          }
 
          if (rc == 0)
          {
-/* debug ("poll() timeout.\n"); */
+            debug ("poll() timeout.\n");
             if (isr_handler_flag == 0)
             {
-/* debug ("exiting isr_handler (timeout)"); */
+               debug ("exiting isr_handler (timeout)"); 
                pthread_exit (NULL);
             }
          }
@@ -402,7 +419,7 @@ isr_handler (void *isr) {
 /* We have an interrupt! */
             if (-1 == read (fdset[1].fd, buf, 64))
             {
-/* debug ("read failed for interrupt"); */
+               debug ("read failed for interrupt"); 
                return (void *) -1;
             }
 
@@ -413,7 +430,7 @@ isr_handler (void *isr) {
          {
             if (-1 == read (fdset[0].fd, buf, 1))
             {
-/* debug ("read failed for stdin read"); */
+               debug ("read failed for stdin read"); 
                return (void *) -1;
             }
 
@@ -425,7 +442,7 @@ isr_handler (void *isr) {
    }
    else
    {
-      /* debug ("exiting isr_handler (flag)"); */
+      debug ("exiting isr_handler (flag)"); 
       pthread_exit (NULL);
    }
 
@@ -459,7 +476,8 @@ TODO: check for errors using retval */
   isr_handler_flag = 1;
   pthread_create (&isr_handler_thread, NULL, isr_handler, (void *) i);
   pthread_tryjoin_np (isr_handler_thread, NULL);
-
+  fprintf(stderr, "pthtread created\n");
+  
   return erl_format("ok");
 }
 

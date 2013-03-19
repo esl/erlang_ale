@@ -208,6 +208,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({gpio_interrupt, Pin, Condition}=Msg, #state{pins=Pins}=State) ->
+    io:format("gpio:handle_info(~w, ~w)~n",[Msg, State]),
     case lists:keyfind(Pin, #pin_info.number, Pins) of
         #pin_info{direction=input,
                   interrupts={Condition, Listeners}} ->
