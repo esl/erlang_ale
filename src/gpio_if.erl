@@ -33,7 +33,7 @@
 -type pin_direction() :: 'input' | 'output'.
 
 -type pin_state() :: 0 | 1.
--type interrupt_condition() :: 'raising' | 'falling' | 'both'.
+-type interrupt_condition() :: 'none' | 'rising' | 'falling' | 'both'.
 -type pin_interrupt() :: 'no_interrupt' |
                          {interrupt_condition(), pid()}.
 
@@ -65,9 +65,14 @@ write(Pin, Value) ->
 read(Pin) ->
     call_existing(Pin, read).
 
-set_int(Pin, Condition) ->
+set_int(Pin, Condition) when Condition == rising;
+                             Condition == falling;
+                             Condition == both;
+                             Condition == none ->
     Requestor = self(),
-    call_existing(Pin, {set_int, Condition, Requestor}).
+    call_existing(Pin, {set_int, Condition, Requestor});
+set_int(_Pin, _Condition) ->
+    {error, wrong_condition}.
 
 %% HW input simulation
 set_value(Pin, Value) ->

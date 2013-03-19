@@ -32,9 +32,8 @@ static int fd_erlang_node;
 
 typedef struct {
    ETERM* pinp;
-   void (*isr) (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep);
+   void (*isr) (ETERM* pinp, ETERM* pidp, ETERM* modep);
    ETERM* pidp;
-   ETERM* refp;
    ETERM* modep;
 } isr_t;
 
@@ -56,12 +55,12 @@ ETERM* gpio_release(ETERM*);
 ETERM* gpio_write(ETERM*, ETERM*);
 ETERM* gpio_read(ETERM*);
 ETERM*
-gpio_set_int (ETERM* pinp, ETERM* pidp, ETERM* refp,
-              void (*isr) (ETERM*, ETERM*, ETERM*, ETERM*), ETERM* modep);
+gpio_set_int (ETERM* pinp, ETERM* pidp, 
+              void (*isr) (ETERM*, ETERM*, ETERM*), ETERM* modep);
 
 
 void
-handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep);
+handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* modep);
 static int gpio_edge (int, char* );
 
 /* helper functions */
@@ -133,7 +132,7 @@ main(int argc, char **argv) {
                } else if (strncmp(ERL_ATOM_PTR(fnp), "set_int", 7) == 0) {
                   arg2p = erl_element(3, tuplep);
                   /* @todo implement the real impl here */
-                  resp = gpio_set_int(arg1p, fromp, refp,
+                  resp = gpio_set_int(arg1p, fromp, 
                                       handle_gpio_interrupt, arg2p);
                } else if (strncmp(ERL_ATOM_PTR(fnp), "release", 7) == 0) {
                   resp = gpio_release(arg1p);
@@ -344,24 +343,14 @@ gpio_edge (int pin, char *edge) {
 
 
 void
-handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* refp, ETERM* modep) {
+handle_gpio_interrupt (ETERM* pinp, ETERM* pidp, ETERM* modep) {
    debug("inside handle_gpio_interrupt\n\r");
    debug("pin: %d, pid_number: %d, mode: %s\n\r",
          ERL_INT_VALUE(pinp), ERL_PID_NUMBER(pidp), ERL_ATOM_PTR(modep));
    
    ETERM* resp = erl_format("{gpio_interrupt, ~w, ~w}", pinp, modep);
 
-   /* erl_send(fd_erlang_node, pidp, erl_format("{~w, ~w}", refp, resp)); */
    erl_send(fd_erlang_node, pidp, resp);
-
-   
-   /* @TODO is this where we should free the memory? */
-
-   erl_free_term(pinp);
-   erl_free_term(pidp);
-   erl_free_term(refp);
-   erl_free_term(modep);
-
 }
 
 /* taken from https://github.com/omerk/pihwm/blob/master/lib/pi_gpio.c */              
@@ -406,7 +395,7 @@ isr_handler (void *isr) {
 
          if (rc == 0)
          {
-            debug ("poll() timeout.\n");
+            /* debug ("poll() timeout.\n"); */
             if (isr_handler_flag == 0)
             {
                debug ("exiting isr_handler (timeout)"); 
@@ -423,7 +412,7 @@ isr_handler (void *isr) {
                return (void *) -1;
             }
 
-            (*i.isr) (i.pinp, i.pidp, i.refp, i.modep);	/* Call the ISR */
+            (*i.isr) (i.pinp, i.pidp, i.modep);	/* Call the ISR */
          }
 
          if (fdset[0].revents & POLLIN)
@@ -450,15 +439,14 @@ isr_handler (void *isr) {
 
 
 ETERM*
-gpio_set_int (ETERM* pinp, ETERM* pidp, ETERM* refp,
-              void (*isr) (ETERM*, ETERM*, ETERM*, ETERM*), ETERM* modep)
+gpio_set_int (ETERM* pinp, ETERM* pidp,
+              void (*isr) (ETERM*, ETERM*, ETERM*), ETERM* modep)
 {
   /* Details of the ISR */
   isr_t *i = (isr_t *) malloc (sizeof (isr_t));
   i->pinp = erl_format("~w",pinp);
   i->isr = isr;
   i->pidp = erl_format("~w", pidp);
-  i->refp = erl_format("~w", refp);
   i->modep = erl_format("~w", modep);
   char mode[10];
   unsigned int pin;
