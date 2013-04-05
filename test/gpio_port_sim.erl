@@ -1,11 +1,16 @@
+%% @doc This is a very simplistic simulation of how a GPIO port
+%% behaves to be used when testing the functionality of the Erlang
+%% code in gpio.
 -module(gpio_port_sim).
+
+
 
 -compile(export_all).
 
 -record(state,
         {owner,
          value,
-         interrupt}).
+         interrupt=none}).
 
 %% @doc simple simulation of a GPIO pin port for testing purposes.
 gpio_port() ->
@@ -45,6 +50,9 @@ gpio_port(#state{owner=Owner, value=Value, interrupt=Cond}=S) ->
             case value_change(Value, V) of
                 Cond ->
                     Owner ! port_reply({gpio_interrupt, Cond});
+                C when C /= no_change,
+                       Cond == both ->
+                    Owner ! port_reply({gpio_interrupt, Cond});
                 _ ->
                     ok
             end,
@@ -52,7 +60,7 @@ gpio_port(#state{owner=Owner, value=Value, interrupt=Cond}=S) ->
     end.
 
 value_change(0, 1) ->
-    raising;
+    rising;
 value_change(1, 0) ->
     falling;
 value_change(_, _) ->

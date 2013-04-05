@@ -6,12 +6,11 @@
 
 
 all() ->
-    [simple_output_test, simple_input_test%,
-     %% interrupt_raising, interrupt_falling, interrupt_both
+    [simple_output_test, simple_input_test,
+     interrupt_rising, interrupt_falling, interrupt_both
     ].
 
-%%init_per_suite(Config) ->
-    
+
 init_per_suite(_Config) ->
     ok = application:start(gproc),
     [].
@@ -26,13 +25,21 @@ init_per_testcase(simple_output_test, Config) ->
     mock_gpio(C1);
 init_per_testcase(simple_input_test, Config) ->
     C1 = [{pin,2}, {value1, 1}, {value2,0}|Config],
+    mock_gpio(C1);
+init_per_testcase(interrupt_rising, Config) ->
+    C1 = [{pin,3}, {value1,0}, {value2,1}, {condition,rising}|Config],
+    mock_gpio(C1);
+init_per_testcase(interrupt_falling, Config) ->
+    C1 = [{pin,4}, {value1,1}, {value2,0}, {condition,falling}|Config],
+    mock_gpio(C1);
+init_per_testcase(interrupt_both, Config) ->
+    C1 = [{pin,5}, {value1,1}, {value2, 0}, {condition,both}|Config],
     mock_gpio(C1).
     
 
 end_per_testcase(_Case, Config) ->
     unmock_gpio(Config),
     ok.
-
 
 mock_gpio(Config) ->
     meck:new(port_lib, [passthrough]),
@@ -84,41 +91,46 @@ simple_input_test(Config) ->
     Port ! {set_value, V2},
     V2 = gpio:read(Pin).
 
-interrupt_raising(_Config) ->
-    Pin = 3,
-    ok = gpio:pin_init_input(Pin),
-    Condition = raising,
-    ok = gpio:pin_set_int(Pin, Condition),
-    ok = sim_gpio:set_value(Pin, 1),
+interrupt_rising(Config) ->
+    one_interrupt(Config).
+
+one_interrupt(Config) ->
+    Pin = ?config(pin, Config),
+    {ok, _} = gpio:init(Pin, input),
+    Port = ?config(port_pid, Config),
+    Condition = ?config(condition, Config),
+    InitialValue = ?config(value1, Config),
+    Port ! {set_value, InitialValue},
+    ok = gpio:set_int(Pin, Condition),
+    TriggerValue = ?config(value2, Config),
+    Port ! {set_value, TriggerValue},
     ok = receive_interrupt(Pin, Condition).
 
-interrupt_falling(_Config) ->
-    Pin = 4,
-    ok = gpio:pin_init_input(Pin),
-    ok = sim_gpio:set_value(Pin, 1),
-    Condition = falling,
-    ok = gpio:pin_set_int(Pin, Condition),
-    ok = sim_gpio:set_value(Pin, 0),
-    ok = receive_interrupt( Pin, Condition).
 
-interrupt_both(_Config) ->
-    Pin = 5,
-    ok = gpio:pin_init_input(Pin),
-    Condition = both,
-    ok = gpio:pin_set_int(Pin, Condition),
-    ok = sim_gpio:set_value(Pin, 1),
+interrupt_falling(Config) ->
+    one_interrupt(Config).
+
+interrupt_both(Config) ->
+    Pin = ?config(pin, Config),
+    {ok, _} = gpio:init(Pin, input),
+    Port = ?config(port_pid, Config),
+    Condition = ?config(condition, Config),
+    ok = gpio:set_int(Pin, Condition),
+    V1 = ?config(value1, Config),
+    Port ! {set_value, V1},
     ok = receive_interrupt(Pin, Condition),
-    ok = sim_gpio:set_value(Pin, 0),
-    0 = gpio:pin_read(Pin),
+    V2 = ?config(value2, Config),
+    Port ! {set_value, V2},
     ok = receive_interrupt(Pin, Condition).
     
   
 receive_interrupt(Pin, Condition) ->
     receive
-        {gpio_interrupt, Pin, Condition} ->
+        {gpio_interrupt, Condition} ->
             ok;
         Unexpected ->
             {error, {unexpected, Unexpected}}
     after 500 ->
+            ct:log("took too long to receive interrupt"),
             error
     end.

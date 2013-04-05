@@ -148,12 +148,12 @@ handle_call(read, _From, #state{direction=output}=State) ->
 handle_call({set_int, Condition, Requestor},
             From,
             #state{direction=input,
-                   interrupt=no_interrupt,
+                   interrupt=none,
                    pending=Pending,
                    port=Port}=State) ->
     port_lib:call_to_port(Port, From, {set_int, Condition}),
     NewPending = [From | Pending],
-    {noreply, State#state{interrupt={Condition, Requestor},
+    {noreply, State#state{interrupt={Condition, [Requestor]},
                           pending=NewPending}};
 handle_call({set_int, Condition, Requestor},
             _From,
