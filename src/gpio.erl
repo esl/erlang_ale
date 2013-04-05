@@ -113,15 +113,13 @@ init([Pin, Direction]) ->
     SharedLib = "gpio_port",
     ok = port_lib:load_driver(SharedLib),
     register(Pin),
-    Port = open_port(SharedLib),
+    Port = port_lib:open_port(SharedLib),
     State = #state{pin=Pin,
                    direction=Direction,
                    port=Port},
     ok = port_lib:sync_call_to_port(Port, {init, Pin, Direction}),
     {ok, State}.
 
-open_port(SharedLib) ->
-    erlang:open_port({spawn,SharedLib}, []).
 
 
 
@@ -201,9 +199,9 @@ handle_info({Port, {data, Msg}},
     apply_after(0, ?MODULE, from_port, [Pin, Msg]),
     {noreply, State}.
 
-terminate(_Reason, #state{}=State) ->
+terminate(_Reason, #state{port=Port}=State) ->
     %% the gproc entry is automatically removed.
-    ok = port_lib:sync_call_to_port(State, release).
+    ok = port_lib:sync_call_to_port(Port, release).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
