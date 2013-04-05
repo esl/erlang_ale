@@ -1,231 +1,213 @@
+%% @doc This is the real implementation of the gpio interface module.
+%% It follows the API of the sim_gpio module, so there will be one
+%% process per pin.
+%% The main difference is that this module is talking to a c-node that
+%% does the low level stuff.
+%% @end
+ 
 -module(gpio).
-
-%% @doc This module is an experiment on how to provide exclusive write
-%% acces to a GPIO pin.
-%% Only the process that has obtained exclusive write by initialising
-%% the pin with this request can write to the pin. All others will be
-%% told that they cannot write to it.
-%% Advanced things: should the process go down the lock on the pin has
-%% to be released.
-%%
-%% GPIO API:
-%% init(Pin, Direction)
-%% release(Pin)
-%% write(Pin, Value)
-%% read(Pin)
-%% set_int(Pin, Condition) - Condition = raising | falling | both.
-%%
-%% NB: when testing remember to start the gproc application first!
-
--ifdef(simulation_mode).
--define(GPIO_MODULE, sim_gpio).
--else.
--define(GPIO_MODULE, gpio_if).
--endif.
-
 
 -behaviour(gen_server).
 
+%% API
+-export([start_link/2]).
 
-%% API to the GPIO pins
-%% @todo add way to clear interrupt
--export([pin_init_input/1,
-         pin_init_output/2,
-         pin_release/1,
-         pin_write/2,
-         pin_read/1,
-         pin_set_int/2
-        ]).
+%% SW API
+-export([init/2,
+         release/1,
+         write/2,
+         read/1,
+         set_int/2]).
 
--export([start_link/0,
-         stop/0]).
+-export([from_port/2]).
 
-         %% gen_server callbacks
+%% %% HW manipulation
+%% -export([set_value/2, %% this is for input pins
+%%          get_value/1 %% checking output pins
+%%          ]).
+
+%% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE). 
+%% exports for the sake of testing
+-export([load_driver/1,
+         send_to_port/2,
+         sync_call_to_port/2,
+         call_to_port/3]).
 
-
--type pin_number()    :: pos_integer().
--type pin_exclusive() :: boolean().
 -type pin_direction() :: 'input' | 'output'.
 
+-type pin_state() :: 0 | 1.
+-type interrupt_condition() :: 'none' | 'rising' | 'falling' | 'both'.
+-type pin_interrupt() :: 'none' |
+                         {interrupt_condition(), [pid()]}.
 
-%% @todo consider if it would be better to split the interrupts field
-%% into two: interrupt_state and listeners.
--record(pin_info,
-        { number       :: pin_number(),
-          direction    :: pin_direction(),
-          owner = none :: 'none' | pid(),
-          interrupts = none :: 'none'
-                             | {sim_gpio:interrupt_condition(), [pid()]}
-        }).
+-export_type([interrupt_condition/0]).
 
 -record(state,
-        { pins = [] :: [#pin_info{}]
+        { pin               :: pos_integer(),
+          direction = input :: pin_direction(),
+          interrupt = none  :: pin_interrupt(),
+          port              :: port(),
+          pending   = []    :: [term()] 
         }).
 
-%% API
-pin_init_input(Pin) ->
-    gen_server:call(?SERVER, {pin_init_input, Pin}).
+%%%===================================================================
+%%% API
+%%%===================================================================
 
-pin_init_output(Pin, false) ->
-    gen_server:call(?SERVER, {pin_init_output, Pin});
-pin_init_output(Pin, true) ->
-    Owner = self(),
-    gen_server:call(?SERVER, {pin_init_output, Pin, Owner}).
-
-pin_release(Pin) ->
-    gen_server:call(?SERVER, {pin_release, Pin}).
-
-pin_write(Pin, Value) ->
-    Requester = self(),
-    gen_server:call(?SERVER, {pin_write, Pin, Value, Requester}).
-
-pin_read(Pin) ->
-    gen_server:call(?SERVER, {pin_read, Pin}).
-
-pin_set_int(Pin, Condition) ->
-    Requester = self(),
-    gen_server:call(?SERVER, {pin_set_int, Pin, Condition, Requester}).
-    
-
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-
-stop() ->
-    gen_server:call(?SERVER, stop).
-    
-
-%% gen_server callbacks
-
-init([]) ->
-    {ok, #state{pins=[]}}.
-
-handle_call({pin_init_input, Pin}, _From, State) ->
-    Direction = input,
-    pin_init(Pin, Direction, none, State);
-handle_call({pin_init_output, Pin}, _From, State) ->
-    Direction = output,
-    pin_init(Pin, Direction, none, State);
-handle_call({pin_init_output, Pin, Owner}, _From, State) ->
-    %% @todo should refactor this so non_exclusive_pin_init code is
-    %% reused.
-    pin_init(Pin, output, Owner, State);
-handle_call({pin_release, Pin}, _From, State) ->
-    case lists:keytake(Pin, #pin_info.number, State#state.pins) of
-        {value, #pin_info{}, NewPins} ->
-            Reply = ?GPIO_MODULE:release(Pin),
-            {reply, Reply, State#state{pins=NewPins}};
-        false ->
-            Reply = {error, release_of_uninitialised_pin},
-            {reply, Reply, State}
-    end;
-handle_call({pin_write, Pin, Value, Requester},
-            _From,
-            State) ->
-    case lists:keyfind(Pin, #pin_info.number, State#state.pins) of
-        #pin_info{direction=output,
-                  owner=Owner} when Owner == none;
-                                    Owner == Requester ->
-            Reply = ?GPIO_MODULE:write(Pin, Value),
-            {reply, Reply, State};
-        #pin_info{} ->
-            Reply = {error, not_an_output_pin},
-            {reply, Reply, State};
-        false ->
-            Reply = {error, uninitialised_pin},
-            {reply, Reply, State}
-    end;
-handle_call({pin_read, Pin},
-            _From,
-            #state{pins=Pins}=State) ->
-    case lists:keyfind(Pin, #pin_info.number, Pins) of
-        #pin_info{direction=input} ->
-            Reply = ?GPIO_MODULE:read(Pin),
-            {reply, Reply, State};
-        #pin_info{} ->
-            Reply = {error, not_an_input_pin},
-            {reply, Reply, State};
-        false ->
-            Reply = {error, uninitialised_pin},
-            {reply, Reply, State}
-    end;
-handle_call({pin_set_int, Pin, Condition, Requester},
-            _From,
-            #state{pins=Pins}=State) ->
-    case lists:keyfind(Pin, #pin_info.number, Pins) of
-        #pin_info{direction=input,interrupts=none}=PinInfo->
-            case ?GPIO_MODULE:set_int(Pin,Condition) of
-                ok ->
-                    NewPinInfo = PinInfo#pin_info{interrupts={Condition, [Requester]}},
-                    NewPins    = lists:keystore(Pin, #pin_info.number, Pins, NewPinInfo),
-                    {reply, ok, State#state{pins=NewPins}};
-                Error ->
-                    {reply, Error, State}
-            end;
-        #pin_info{direction=input, interrupts={Condition,Pids}}=PinInfo ->
-            NewPinInfo = PinInfo#pin_info{interrupts={Condition,[Requester|Pids]}},
-            NewPins    = lists:keystore(Pin, #pin_info.number, Pins, NewPinInfo),
-            {reply, ok, State#state{pins=NewPins}};
-        #pin_info{direction=input} ->
-            Reply = {error, interrupt_condition_not_compatible_with_existing},
-            {reply, Reply, State};
-        #pin_info{} ->
-            Reply = {error, not_an_input_pin},
-            {reply, Reply, State};
-        false ->
-            Reply = {error, uninitialised_pin},
-            {reply, Reply, State}
-    end;
-handle_call(stop, _From, State) ->
-    {stop, normal, ok, State}.
-
-pin_init(Pin, Direction, Owner, State) ->
-    case lists:keyfind(Pin, #pin_info.number, State#state.pins) of
-        #pin_info{} ->
-            Reply = {error, pin_already_initialised},
-            {reply, Reply, State};
-        false ->
-            try ?GPIO_MODULE:init(Pin, Direction) of
-                {ok, _Pid} ->
-                    PinInfo = #pin_info{number=Pin,
-                                        direction=Direction,
-                                        owner=Owner},
-                    Reply = ok,
-                    NewPins = [PinInfo | State#state.pins],
-                    {reply, Reply, State#state{pins = NewPins}}
-            catch
-                _:_ ->
-                    Reply = {error, pin_init_failed},
-                    {reply, Reply, State}
-            end
+%% @todo Add init for exclusive pins
+init(Pin, Direction) ->
+    case gproc:lookup_local_name(pname(Pin)) of
+        undefined ->
+            start_link(Pin, Direction);
+        _Pid ->
+            {error, pin_already_initialised}
     end.
+            
+release(Pin) ->
+    call_existing(Pin, release).
+
+
+write(Pin, Value) ->
+    call_existing(Pin, {write, Value}).
+
+read(Pin) ->
+    call_existing(Pin, read).
+
+set_int(Pin, Condition) when Condition == rising;
+                             Condition == falling;
+                             Condition == both;
+                             Condition == none ->
+    Requestor = self(),
+    call_existing(Pin, {set_int, Condition, Requestor});
+set_int(_Pin, _Condition) ->
+    {error, wrong_condition}.
+
+from_port(Pin, Msg) ->
+    call_existing(Pin, {from_port, Msg}).
+
+
+%% %% HW input simulation
+%% set_value(Pin, Value) ->
+%%     call_existing(Pin, {set_value, Value}).
+
+%% %% check what an output pin has been set to.
+%% get_value(Pin) ->
+%%     call_existing(Pin, get_value).
+
+call_existing(Pin, Msg) ->
+    case gproc:lookup_local_name(pname(Pin)) of
+        undefined ->
+            {error, pin_not_present};
+        Pid ->
+            gen_server:call(Pid, Msg)
+    end.
+
+
+start_link(Pin, Direction) ->
+    gen_server:start_link(?MODULE, [Pin, Direction], []).
+
+%%%===================================================================
+%%% gen_server callbacks
+%%%===================================================================
+
+
+init([Pin, Direction]) ->
+    SharedLib = "gpio_port",
+    ok = gpio:load_driver(SharedLib),
+    register(Pin),
+    Port = gpio:open_port(SharedLib),
+    State = #state{pin=Pin,
+                   direction=Direction,
+                   port=Port},
+    ok = gpio:sync_call_to_port(State, {init, Pin, Direction}),
+    {ok, State}.
+
+open_port(SharedLib) ->
+    erlang:open_port({spawn,SharedLib}, []).
+
+
+
+handle_call(release, _From, State) ->
+    {stop, normal, ok, State};
+handle_call({write, Value}, From, #state{direction=output,
+                                         pending=Pending}=State) ->
+    gpio:call_to_port(State, From, {write, Value}),
+    NewPending = [From | Pending],
+    {noreply,  State#state{pending=NewPending}};
+handle_call({write, _Value}, _From, #state{direction=input}=State) ->
+    %% @todo: check with Ömer what the behaviour should be here
+    Reply = {error, writing_to_input_pin},
+    {reply, Reply, State};
+handle_call(read, From, #state{direction=input,
+                               pin=Pin,
+                               pending=Pending}=State) ->
+    gpio:call_to_port(State, From, read),
+    NewPending = [From | Pending ],
+    {noreply, State#state{pending=NewPending}};
+handle_call(read, _From, #state{direction=output}=State) ->
+    Reply = {error, reading_from_output_pin},
+    {reply, Reply, State};
+handle_call({set_int, Condition, Requestor},
+            From,
+            #state{direction=input,
+                   interrupt=no_interrupt,
+                   pending=Pending}=State) ->
+    gpio:call_to_port(State, From, {set_int, Condition}),
+    NewPending = [From | Pending],
+    {noreply, State#state{interrupt={Condition, Requestor},
+                          pending=NewPending}};
+handle_call({set_int, Condition, Requestor},
+            _From,
+            #state{direction=input,
+                   interrupt={Condition,Pids}}=State) ->
+    Reply = ok,
+    Interrupt = {Condition, [Requestor|Pids]},
+    {reply, Reply, State#state{interrupt=Interrupt}};
+handle_call({set_int, Condition, Requestor},
+            _From,
+            #state{direction=input,
+                   interrupt={_,_}}=State) ->
+    Reply = {error, unable_to_change_interrupt},
+    {reply, Reply, State};
+handle_call({set_int, _Condition, _Requestor},
+            _From,
+            #state{direction=output}=State) ->
+    Reply = {error, setting_interrupt_on_output_pin},
+    {reply, Reply, State};
+handle_call({from_port, {gpio_interrupt, Condition}=Msg},
+            _From,
+            #state{interrupt={Condition, Pids}}=State) ->
+    [ Pid ! Msg || Pid <- Pids ],
+    Reply = ok,
+    {reply, Reply, State};
+handle_call({from_port, {port_reply, To, Msg}},
+            _From,
+           #state{pending=Pending}=State) ->
+    %% @todo: should we do something if To is not in Pending list?
+    io:format("gpio_if:handle_info - Got a reply to a pending message {~p, ~p}~n",
+              [To, Msg]),
+    NewPending = lists:delete(To, Pending),
+    gen_server:reply(To, Msg),
+    {reply, ok, State#state{pending=NewPending}}.
 
             
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({gpio_interrupt, Pin, Condition}=Msg, #state{pins=Pins}=State) ->
-    io:format("gpio:handle_info(~w, ~w)~n",[Msg, State]),
-    case lists:keyfind(Pin, #pin_info.number, Pins) of
-        #pin_info{direction=input,
-                  interrupts={Condition, Listeners}} ->
-            [ L ! Msg || L <- Listeners ],
-            {noreply, State};
-        #pin_info{} ->
-            %% @todo must log this error thing in a sensible manner
-            {noreply, State};
-        false ->
-            %% @todo must log this error thing in a sensible manner
-            {noreply, State}
-    end;
-handle_info(_Msg, State) ->
+
+%% In order to be able to test using a mocking library we call
+%% the from_port/2 function for all messages from the port. 
+handle_info({Port, {data, Msg}},
+            #state{port=Port, pin=Pin}=State) ->
+    apply_after(0, ?MODULE, from_port, [Pin, Msg]),
     {noreply, State}.
 
-terminate(_Reason, _State) ->
-    ok.
+terminate(_Reason, #state{}=State) ->
+    %% the gproc entry is automatically removed.
+    ok = gpio:sync_call_to_port(State, release).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -234,3 +216,58 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+register(Pin) ->
+    gproc:reg({n, l, pname(Pin)}).
+
+pname(Pin) ->
+    {gpio_pin, Pin}.
+
+
+%% @doc value_change(Old, New)
+value_change(0, 1) ->
+    raising;
+value_change(1, 0) ->
+    falling;
+value_change(_, _) ->
+    no_change.
+
+
+
+send_to_port(#state{port=Port}, Msg) ->
+    port_command(Port, Msg).
+
+
+sync_call_to_port(#state{port=Port}=State, Msg) ->
+    gpio:send_to_port(State, Msg),
+    receive
+        {Port, {data, Result}} ->
+            Result
+    end.
+
+%% @doc the response to this call has to be handled in the handle_info
+%% function. The From parameter is there to figure out which of the
+%% pending requests that the response belongs to.
+call_to_port(State, From, Msg) ->
+    gpio:send_to_port(State, {call, From, Msg}).
+    
+
+
+load_driver(SharedLib) ->
+    case erl_ddll:load_driver(".", SharedLib) of
+        ok -> ok;
+        {error, already_loaded} -> ok;
+        _ -> exit({error, could_not_load_driver})
+    end.
+
+
+apply_after(Time, M, F, Args) ->
+    Ref = make_ref(),
+    Self = self(),
+    Pid = spawn( fun() ->
+                         receive
+                             Ref ->
+                                 apply(M, F, Args)
+                         end
+                 end ),
+    erlang:send_after(Time, Pid, Ref), 
+    ok.

@@ -31,6 +31,9 @@ shell:
 test: test/gpio_SUITE.erl
 	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test
 
+run_test: 
+	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test
+
 
 gpio_node: priv/gpio_node.o
 	gcc ${LDFLAGS} $< -lerl_interface -lei -lpthread -o $@
