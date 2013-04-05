@@ -30,11 +30,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-%% exports for the sake of testing
--export([load_driver/1,
-         send_to_port/2,
-         sync_call_to_port/2,
-         call_to_port/3]).
 
 -type pin_direction() :: 'input' | 'output'.
 
@@ -116,13 +111,13 @@ start_link(Pin, Direction) ->
 
 init([Pin, Direction]) ->
     SharedLib = "gpio_port",
-    ok = gpio:load_driver(SharedLib),
+    ok = port_lib:load_driver(SharedLib),
     register(Pin),
-    Port = gpio:open_port(SharedLib),
+    Port = open_port(SharedLib),
     State = #state{pin=Pin,
                    direction=Direction,
                    port=Port},
-    ok = gpio:sync_call_to_port(State, {init, Pin, Direction}),
+    ok = port_lib:sync_call_to_port(Port, {init, Pin, Direction}),
     {ok, State}.
 
 open_port(SharedLib) ->
@@ -133,8 +128,9 @@ open_port(SharedLib) ->
 handle_call(release, _From, State) ->
     {stop, normal, ok, State};
 handle_call({write, Value}, From, #state{direction=output,
-                                         pending=Pending}=State) ->
-    gpio:call_to_port(State, From, {write, Value}),
+                                         pending=Pending,
+                                         port=Port}=State) ->
+    port_lib:call_to_port(Port, From, {write, Value}),
     NewPending = [From | Pending],
     {noreply,  State#state{pending=NewPending}};
 handle_call({write, _Value}, _From, #state{direction=input}=State) ->
@@ -143,8 +139,9 @@ handle_call({write, _Value}, _From, #state{direction=input}=State) ->
     {reply, Reply, State};
 handle_call(read, From, #state{direction=input,
                                pin=Pin,
-                               pending=Pending}=State) ->
-    gpio:call_to_port(State, From, read),
+                               pending=Pending,
+                               port=Port}=State) ->
+    port_lib:call_to_port(Port, From, read),
     NewPending = [From | Pending ],
     {noreply, State#state{pending=NewPending}};
 handle_call(read, _From, #state{direction=output}=State) ->
@@ -154,8 +151,9 @@ handle_call({set_int, Condition, Requestor},
             From,
             #state{direction=input,
                    interrupt=no_interrupt,
-                   pending=Pending}=State) ->
-    gpio:call_to_port(State, From, {set_int, Condition}),
+                   pending=Pending,
+                   port=Port}=State) ->
+    port_lib:call_to_port(Port, From, {set_int, Condition}),
     NewPending = [From | Pending],
     {noreply, State#state{interrupt={Condition, Requestor},
                           pending=NewPending}};
@@ -187,8 +185,6 @@ handle_call({from_port, {port_reply, To, Msg}},
             _From,
            #state{pending=Pending}=State) ->
     %% @todo: should we do something if To is not in Pending list?
-    io:format("gpio_if:handle_info - Got a reply to a pending message {~p, ~p}~n",
-              [To, Msg]),
     NewPending = lists:delete(To, Pending),
     gen_server:reply(To, Msg),
     {reply, ok, State#state{pending=NewPending}}.
@@ -207,7 +203,7 @@ handle_info({Port, {data, Msg}},
 
 terminate(_Reason, #state{}=State) ->
     %% the gproc entry is automatically removed.
-    ok = gpio:sync_call_to_port(State, release).
+    ok = port_lib:sync_call_to_port(State, release).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -233,31 +229,12 @@ value_change(_, _) ->
 
 
 
-send_to_port(#state{port=Port}, Msg) ->
-    port_command(Port, Msg).
 
 
-sync_call_to_port(#state{port=Port}=State, Msg) ->
-    gpio:send_to_port(State, Msg),
-    receive
-        {Port, {data, Result}} ->
-            Result
-    end.
 
-%% @doc the response to this call has to be handled in the handle_info
-%% function. The From parameter is there to figure out which of the
-%% pending requests that the response belongs to.
-call_to_port(State, From, Msg) ->
-    gpio:send_to_port(State, {call, From, Msg}).
     
 
 
-load_driver(SharedLib) ->
-    case erl_ddll:load_driver(".", SharedLib) of
-        ok -> ok;
-        {error, already_loaded} -> ok;
-        _ -> exit({error, could_not_load_driver})
-    end.
 
 
 apply_after(Time, M, F, Args) ->

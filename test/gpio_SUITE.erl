@@ -1,11 +1,12 @@
 -module(gpio_SUITE).
 
+-include_lib("common_test/include/ct.hrl").
+
 -compile(export_all).
 
 
 all() ->
-    [simple_output_test
-     %%    , simple_input_test,
+    [simple_output_test%, simple_input_test,
      %% interrupt_raising, interrupt_falling, interrupt_both
     ].
 
@@ -20,54 +21,59 @@ end_per_suite(_Config) ->
     ok.
 
 
-init_per_testcase(_Case, Config) ->
-    %% {ok, _} = gpio:start_link(),
-    Config.
+init_per_testcase(simple_output_test, Config) ->
+    C1 =  [{pin,1}, {value1,1}, {value2,0}|Config],
+    mock_gpio(C1),
+    C1;
+init_per_testcase(simple_input_test, Config) ->
+    C1 = [{pin,2}, {value1, 1}, {value2,0}|Config],
+    mock_gpio(C1),
+    C1.
+    
 
-end_per_testcase(_Case, _Config) ->
-    %% ok = gpio:stop(),
+end_per_testcase(_Case, Config) ->
+    unmock_gpio(Config),
     ok.
 
 
 mock_gpio(_Config) ->
-    meck:new(gpio, [passthrough]),
-    meck:expect(gpio, load_driver, fun(_) -> ok end),
-    meck:expect(gpio, send_to_port, fun(_,_) -> ok end),
-    meck:expect(gpio, sync_call_to_port, fun(_,_) -> ok end),
-    meck:expect(gpio, call_to_port, fun mocked_gpio_call_to_port/3),
-    meck:expect(gpio, open_port, fun(_) -> some_port end),
-    ok = gpio:load_driver(pap),
+    meck:new(port_lib, [passthrough]),
+    meck:expect(port_lib, load_driver, fun(_) -> ok end),
+    meck:expect(port_lib, send_to_port, fun(_,_) -> ok end),
+    meck:expect(port_lib, sync_call_to_port, fun(_,_) -> ok end),
+    meck:expect(port_lib, call_to_port, fun mocked_port_lib_call_to_port/3),
+    meck:expect(port_lib, open_port, fun(_) -> some_port end),
+    ok.
+    
+unmock_gpio(_Config) ->
+    meck:unload(port_lib),
     ok.
 
-unmock_gpio(_Config) ->
-    meck:unload(gpio).
-                                           
-mocked_gpio_call_to_port(_State, From, {write,_}) ->
-    ct:log("in mocked_gpio_call_to_port"),
+mocked_port_lib_call_to_port(_Port, From, {write,_}) ->
     spawn( fun() ->
-                   ct:log("reading to call from_port"),
                    gpio:from_port(1, {port_reply, From, ok})
            end),
     ok.
        
+%%-------------------------------------------------------
+%% Test cases
+%%-------------------------------------------------------        
 
 simple_output_test(Config) ->
-    mock_gpio(Config),
-    ok = gpio:load_driver("tehu"),
-    {ok, _} = gpio:init(1, output),
-    Value = 1,
-    ok = gpio:write(1, Value),
-    true = meck:called(gpio, call_to_port, ['_', '_', {write, Value}]),
-    V2 = 0,
-    ok = gpio:write(1, V2),
-    true = meck:called(gpio, call_to_port, ['_', '_', {write, V2}]),
-    ok = gpio:release(1),
-    unmock_gpio(Config).
+    Pin = ?config(pin, Config),
+    {ok, _} = gpio:init(Pin, output),
+    Value = ?config(value1, Config),
+    ok = gpio:write(Pin, Value),
+    true = meck:called(port_lib, call_to_port, ['_', '_', {write, Value}]),
+    V2 = ?config(value2, Config),
+    ok = gpio:write(Pin, V2),
+    true = meck:called(port_lib, call_to_port, ['_', '_', {write, V2}]),
+    ok = gpio:release(Pin).
     
     
     
 simple_input_test(_Config) ->
-    ok = gpio:pin_init_input(2),
+    {ok, _} = gpio:pin_init_input(2),
     Value = 1,
     ok = sim_gpio:set_value(2, Value),
     Value = gpio:pin_read(2),

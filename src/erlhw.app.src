@@ -4,7 +4,7 @@
 {application,erlhw,
              [{description,"erlhw - access to hardware"},
               {vsn,"0.0.1"},
-              {modules,[gpio, sim_gpio]},
+              {modules,[gpio, port_lib]},
               {registered,[]},
               {applications,[kernel,stdlib,gproc]},
               {start_phases,[]}

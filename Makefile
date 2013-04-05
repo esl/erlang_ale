@@ -28,10 +28,10 @@ build_examples:
 shell: 
 	erl  -sname e1 -setcookie secretcookie -pz deps/*/ebin -pz ebin -pz examples
 
-test: test/gpio_SUITE.erl
+test:
 	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test
 
-run_test: 
+run_test:
 	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test
 
 
