@@ -1,10 +1,12 @@
 %%%-------------------------------------------------------------------
-%%% @author Torben Hoffmann <>
-%%% @copyright (C) 2013, Torben Hoffmann
-%%% @doc
-%%%
+%%% @author Torben Hoffmann <torben@erlang-solutions.com>
+%%% @copyright (C) 2013, Erlang Solutions Limited
+%%% @doc Simple example that shows how to program GPIO pins in
+%%% Erlang/ALE.
+%%% The idea is to use two LEDs to represent 2's and 1's and just
+%%% count up and down between 0 and 3 by pressing buttens for +1 and
+%%% -1.
 %%% @end
-%%% Created : 19 Mar 2013 by Torben Hoffmann <>
 %%%-------------------------------------------------------------------
 -module(gpio_counter).
 
@@ -33,8 +35,6 @@
 
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-
-
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -70,13 +70,6 @@ handle_info({gpio_interrupt, _Pin, _Condition},
             State) ->
     {noreply, State}.
 
-set_counter_pins(N1) ->
-    <<Twos:1, Ones:1>> = <<N1:2>>,
-    gpio:pin_write(?ONES_PIN, Ones),
-    gpio:pin_write(?TWOS_PIN, Twos).
-
-        
-
 terminate(_Reason, _State) ->
     ok.
 
@@ -86,6 +79,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+set_counter_pins(N1) ->
+    <<Twos:1, Ones:1>> = <<N1:2>>,
+    gpio:pin_write(?ONES_PIN, Ones),
+    gpio:pin_write(?TWOS_PIN, Twos).
 
 
 

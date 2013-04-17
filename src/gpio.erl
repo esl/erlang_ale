@@ -1,19 +1,20 @@
-%% @doc This is the real implementation of the gpio interface module.
-%% It follows the API of the sim_gpio module, so there will be one
-%% process per pin.
-%% The main difference is that this module is talking to a c-node that
-%% does the low level stuff.
+%% @doc This is the implementation of the gpio interface module.
+%%
+%% There is one process per GPIO pin. Each process opens a C-port that
+%% manipulates the hardware.
+%%
+%% The one-process-per-pin design has been choosen since it allows to
+%% attach each pin to the appropriate place in the supervision tree of
+%% the entire application.  
 %% @end
- 
+%% @copyright 2013 Erlang Solutions Limited
+
 -module(gpio).
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
-
-%% SW API
--export([init/2,
+-export([start_link/2,
          release/1,
          write/2,
          read/1,
@@ -21,16 +22,12 @@
 
 -export([from_port/2]).
 
-%% %% HW manipulation
-%% -export([set_value/2, %% this is for input pins
-%%          get_value/1 %% checking output pins
-%%          ]).
-
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
 
+-type pin() :: 0..63.
 -type pin_direction() :: 'input' | 'output'.
 
 -type pin_state() :: 0 | 1.
@@ -52,25 +49,53 @@
 %%% API
 %%%===================================================================
 
+%% @doc starts a pin with the given direction.
+%%
+%% To simplify things we aways identify the process for a pin by the
+%% pin number, so there is no need to remember the Pid of a pin
+%% process spawned.
 %% @todo Add init for exclusive pins
-init(Pin, Direction) ->
+%% @end
+-spec start_link(pin(), pin_direction()) ->
+                        {'ok', pid()} | 'ignore' | {'error', term()}.
+start_link(Pin, Direction) ->
     case gproc:lookup_local_name(pname(Pin)) of
         undefined ->
-            start_link(Pin, Direction);
+            gen_server:start_link(?MODULE, [Pin, Direction], []);
         _Pid ->
             {error, pin_already_initialised}
     end.
-            
+
+
+%% @doc release/1 stops the pin process and frees resources on the
+%% hardware.
+%% @end
+-spec release(pin()) -> 'ok'.
 release(Pin) ->
     call_existing(Pin, release).
 
-
+%% @doc write/2 sets an output pin to the value given.
+%% @end
+-spec write(pin(), pin_state()) -> 'ok' | {'error', 'writing_to_input_pin'}.
 write(Pin, Value) ->
     call_existing(Pin, {write, Value}).
 
+%% @doc read/1 returns the value of an input pin.
+%% @end
+-spec read(pin()) -> pin_state() | {'error', 'reading_from_output_pin'}.
 read(Pin) ->
     call_existing(Pin, read).
 
+%% @doc set_int/2 sets an interrupt on a pin with a given condition.
+%% The requesting process will be sent a message with the structure
+%% {gpio_interrupt, Condition} when the interrupt triggers.
+%% More than one process can listen on an interrupt condition, but
+%% only one interrupt condition can be set at a time.
+%% @todo Specify the errors more precisely.
+%% @end
+-spec set_int(pin(), interrupt_condition()) -> 'ok' | {'error', Error}
+                                                   when Error :: 'wrong_condition'
+                                                               | term().
 set_int(Pin, Condition) when Condition == rising;
                              Condition == falling;
                              Condition == both;
@@ -80,17 +105,15 @@ set_int(Pin, Condition) when Condition == rising;
 set_int(_Pin, _Condition) ->
     {error, wrong_condition}.
 
+%% @doc from_port/2 should not be called from the outside!
+%% It is used to transform the messages from a port into a message
+%% that is sent to the pin process using call instead of forcing us to
+%% handle the messages in handle_info/2.
+%% @end
 from_port(Pin, Msg) ->
     call_existing(Pin, {from_port, Msg}).
 
 
-%% %% HW input simulation
-%% set_value(Pin, Value) ->
-%%     call_existing(Pin, {set_value, Value}).
-
-%% %% check what an output pin has been set to.
-%% get_value(Pin) ->
-%%     call_existing(Pin, get_value).
 
 call_existing(Pin, Msg) ->
     case gproc:lookup_local_name(pname(Pin)) of
@@ -101,8 +124,6 @@ call_existing(Pin, Msg) ->
     end.
 
 
-start_link(Pin, Direction) ->
-    gen_server:start_link(?MODULE, [Pin, Direction], []).
 
 %%%===================================================================
 %%% gen_server callbacks
