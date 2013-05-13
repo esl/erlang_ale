@@ -31,8 +31,10 @@ $(PIHWMLIB):
 build: rebar_plugin
 	rebar compile
 
-rebar_plugin: plugins/compile-deps/src/rebar_compiledeps_plugin.beam plugins/compile-deps/src/rebar_compiledeps_plugin.beam
-	erlc plugins/compile-deps/src/rebar_compiledeps_plugin.erl -o 	plugins/compile-deps/src/rebar_compiledeps_plugin.beam
+rebar_plugin: plugins/compile-deps/src/rebar_compiledeps_plugin.beam
+
+plugins/compile-deps/src/%.beam: plugins/compile-deps/src/%.erl
+	erlc -o plugins/compile-deps/src $<
 
 build_sim:
 	rebar -D simulation_mode  compile
