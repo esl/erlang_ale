@@ -28,8 +28,11 @@ $(PIHWMLIB):
 	$(CC) $(CFLAGS) -c -lpthread -lerl_interface -lei lib/$@.c 
 
 
-build:
+build: rebar_plugin
 	rebar compile
+
+rebar_plugin: plugins/compile-deps/src/rebar_compiledeps_plugin.beam plugins/compile-deps/src/rebar_compiledeps_plugin.beam
+	erlc plugins/compile-deps/src/rebar_compiledeps_plugin.erl -o 	plugins/compile-deps/src/rebar_compiledeps_plugin.beam
 
 build_sim:
 	rebar -D simulation_mode  compile

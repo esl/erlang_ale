@@ -4,9 +4,9 @@
 #include <string.h>
 #include <ei.h>
 
-#include "lib/port_comms.h"
-#include "lib/pihwm.h"
-#include "lib/pi_gpio.h"
+#include <port_comms.h>
+#include <pihwm.h>
+#include <pi_gpio.h>
 
 #define BUF_SIZE 128
 

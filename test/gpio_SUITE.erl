@@ -72,9 +72,11 @@ simple_output_test(Config) ->
     Value = ?config(value1, Config),
     ok = gpio:write(Pin, Value),
     true = meck:called(port_lib, call_to_port, ['_', '_', {write, Value}]),
+    Value = gpio:read(Pin),
     V2 = ?config(value2, Config),
     ok = gpio:write(Pin, V2),
     true = meck:called(port_lib, call_to_port, ['_', '_', {write, V2}]),
+    V2 = gpio:read(Pin),
     ok = gpio:release(Pin).
     
 
