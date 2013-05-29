@@ -57,14 +57,14 @@
 %% @todo Add init for exclusive pins
 %% @end
 -spec start_link(pin(), pin_direction()) ->
-                        {'ok', pid()} | 'ignore' | {'error', term()}.
+                    {'ok', pid()} | 'ignore' | {'error', term()}.
 start_link(Pin, Direction) ->
-    case gproc:lookup_local_name(pname(Pin)) of
-        undefined ->
-            gen_server:start_link(?MODULE, [Pin, Direction], []);
-        _Pid ->
-            {error, pin_already_initialised}
-    end.
+  case gproc:lookup_local_name(pname(Pin)) of
+    undefined ->
+      gen_server:start_link(?MODULE, [Pin, Direction], []);
+    _Pid ->
+      {error, pin_already_initialised}
+  end.
 
 
 %% @doc release/1 stops the pin process and frees resources on the
@@ -72,19 +72,19 @@ start_link(Pin, Direction) ->
 %% @end
 -spec release(pin()) -> 'ok'.
 release(Pin) ->
-    call_existing(Pin, release).
+  call_existing(Pin, release).
 
 %% @doc write/2 sets an output pin to the value given.
 %% @end
 -spec write(pin(), pin_state()) -> 'ok' | {'error', 'writing_to_input_pin'}.
 write(Pin, Value) ->
-    call_existing(Pin, {write, Value}).
+  call_existing(Pin, {write, Value}).
 
 %% @doc read/1 returns the value of an input pin.
 %% @end
 -spec read(pin()) -> pin_state() | {'error', 'reading_from_output_pin'}.
 read(Pin) ->
-    call_existing(Pin, read).
+  call_existing(Pin, read).
 
 %% @doc set_int/2 sets an interrupt on a pin with a given condition.
 %% The requesting process will be sent a message with the structure
@@ -94,16 +94,16 @@ read(Pin) ->
 %% @todo Specify the errors more precisely.
 %% @end
 -spec set_int(pin(), interrupt_condition()) -> 'ok' | {'error', Error}
-                                                   when Error :: 'wrong_condition'
-                                                               | term().
+                                                 when Error :: 'wrong_condition'
+                                                             | term().
 set_int(Pin, Condition) when Condition == rising;
                              Condition == falling;
                              Condition == both;
                              Condition == none ->
-    Requestor = self(),
-    call_existing(Pin, {set_int, Condition, Requestor});
+  Requestor = self(),
+  call_existing(Pin, {set_int, Condition, Requestor});
 set_int(_Pin, _Condition) ->
-    {error, wrong_condition}.
+  {error, wrong_condition}.
 
 %% @doc from_port/2 should not be called from the outside!
 %% It is used to transform the messages from a port into a message
@@ -111,17 +111,17 @@ set_int(_Pin, _Condition) ->
 %% handle the messages in handle_info/2.
 %% @end
 from_port(Pin, Msg) ->
-    call_existing(Pin, {from_port, Msg}).
+  call_existing(Pin, {from_port, Msg}).
 
 
 
 call_existing(Pin, Msg) ->
-    case gproc:lookup_local_name(pname(Pin)) of
-        undefined ->
-            {error, pin_not_present};
-        Pid ->
-            gen_server:call(Pid, Msg)
-    end.
+  case gproc:lookup_local_name(pname(Pin)) of
+    undefined ->
+      {error, pin_not_present};
+    Pid ->
+      gen_server:call(Pid, Msg)
+  end.
 
 
 
@@ -131,139 +131,143 @@ call_existing(Pin, Msg) ->
 
 
 init([Pin, Direction]) ->
-    SharedLib = "gpio_port",
-    ok = port_lib:load_driver(SharedLib),
-    register(Pin),
-    Port = port_lib:open_port(SharedLib),
-    State = #state{pin=Pin,
-                   direction=Direction,
-                   port=Port},
-    ok = port_lib:sync_call_to_port(Port, {init, Pin, Direction}),
-    {ok, State}.
+  SharedLib = "priv/gpio_port",
+  %%    ok = port_lib:load_driver(SharedLib),
+  register(Pin),
+  Port = port_lib:open_port(SharedLib),
+  State = #state{pin=Pin,
+                 direction=Direction,
+                 port=Port},
+  ok = port_lib:sync_call_to_port(Port, {init, Pin, Direction}),
+  {ok, State}.
 
 
 
 
 handle_call(release, _From, State) ->
-    {stop, normal, ok, State};
+  {stop, normal, ok, State};
 handle_call({write, Value}, From, #state{direction=output,
                                          pending=Pending,
                                          port=Port}=State) ->
-    port_lib:call_to_port(Port, From, {write, Value}),
-    NewPending = [From | Pending],
-    {noreply,  State#state{pending=NewPending}};
+  port_lib:call_to_port(Port, From, {write, Value}),
+  NewPending = [From | Pending],
+  {noreply,  State#state{pending=NewPending}};
 handle_call({write, _Value}, _From, #state{direction=input}=State) ->
-    %% @todo: check with Ömer what the behaviour should be here
-    Reply = {error, writing_to_input_pin},
-    {reply, Reply, State};
+  %% @todo: check with Ömer what the behaviour should be here
+  Reply = {error, writing_to_input_pin},
+  {reply, Reply, State};
 handle_call(read, From, #state{direction=input,
                                pin=Pin,
                                pending=Pending,
                                port=Port}=State) ->
-    port_lib:call_to_port(Port, From, read),
-    NewPending = [From | Pending ],
-    {noreply, State#state{pending=NewPending}};
+  port_lib:call_to_port(Port, From, read),
+  NewPending = [From | Pending ],
+  {noreply, State#state{pending=NewPending}};
 handle_call(read, _From, #state{direction=output}=State) ->
-    Reply = {error, reading_from_output_pin},
-    {reply, Reply, State};
+  Reply = {error, reading_from_output_pin},
+  {reply, Reply, State};
 handle_call({set_int, Condition, Requestor},
             From,
             #state{direction=input,
                    interrupt=none,
                    pending=Pending,
                    port=Port}=State) ->
-    port_lib:call_to_port(Port, From, {set_int, Condition}),
-    NewPending = [From | Pending],
-    {noreply, State#state{interrupt={Condition, [Requestor]},
-                          pending=NewPending}};
+  port_lib:call_to_port(Port, From, {set_int, Condition}),
+  NewPending = [From | Pending],
+  {noreply, State#state{interrupt={Condition, [Requestor]},
+                        pending=NewPending}};
 handle_call({set_int, Condition, Requestor},
             _From,
             #state{direction=input,
                    interrupt={Condition,Pids}}=State) ->
-    Reply = ok,
-    Interrupt = {Condition, [Requestor|Pids]},
-    {reply, Reply, State#state{interrupt=Interrupt}};
+  Reply = ok,
+  Interrupt = {Condition, [Requestor|Pids]},
+  {reply, Reply, State#state{interrupt=Interrupt}};
 handle_call({set_int, Condition, Requestor},
             _From,
             #state{direction=input,
                    interrupt={_,_}}=State) ->
-    Reply = {error, unable_to_change_interrupt},
-    {reply, Reply, State};
+  Reply = {error, unable_to_change_interrupt},
+  {reply, Reply, State};
 handle_call({set_int, _Condition, _Requestor},
             _From,
             #state{direction=output}=State) ->
-    Reply = {error, setting_interrupt_on_output_pin},
-    {reply, Reply, State};
+  Reply = {error, setting_interrupt_on_output_pin},
+  {reply, Reply, State};
 handle_call({from_port, {gpio_interrupt, Condition}=Msg},
             _From,
             #state{interrupt={Condition, Pids}}=State) ->
-    [ Pid ! Msg || Pid <- Pids ],
-    Reply = ok,
-    {reply, Reply, State};
+  [ Pid ! Msg || Pid <- Pids ],
+  Reply = ok,
+  {reply, Reply, State};
 handle_call({from_port, {port_reply, To, Msg}},
             _From,
-           #state{pending=Pending}=State) ->
-    %% @todo: should we do something if To is not in Pending list?
-    NewPending = lists:delete(To, Pending),
-    gen_server:reply(To, Msg),
-    {reply, ok, State#state{pending=NewPending}}.
+            #state{pending=Pending}=State) ->
+  %% @todo: should we do something if To is not in Pending list?
+  NewPending = lists:delete(To, Pending),
+  gen_server:reply(To, Msg),
+  {reply, ok, State#state{pending=NewPending}}.
 
-            
+
 handle_cast(_Msg, State) ->
-    {noreply, State}.
+  {noreply, State}.
 
 
 %% In order to be able to test using a mocking library we call
 %% the from_port/2 function for all messages from the port. 
 handle_info({Port, {data, Msg}},
             #state{port=Port, pin=Pin}=State) ->
-    apply_after(0, ?MODULE, from_port, [Pin, Msg]),
-    {noreply, State}.
+  apply_after(0, ?MODULE, from_port, [Pin, Msg]),
+  {noreply, State}.
 
 terminate(_Reason, #state{port=Port}=State) ->
-    %% the gproc entry is automatically removed.
-    ok = port_lib:sync_call_to_port(Port, release).
+  %% the gproc entry is automatically removed.
+  ok = port_lib:sync_call_to_port(Port, release).
 
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+  {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
 register(Pin) ->
-    gproc:reg({n, l, pname(Pin)}).
+  gproc:reg({n, l, pname(Pin)}).
 
 pname(Pin) ->
-    {gpio_pin, Pin}.
+  {gpio_pin, Pin}.
 
 
 %% @doc value_change(Old, New)
 value_change(0, 1) ->
-    raising;
+  raising;
 value_change(1, 0) ->
-    falling;
+  falling;
 value_change(_, _) ->
-    no_change.
+  no_change.
 
 
 
 
 
 
-    
+
 
 
 
 
 apply_after(Time, M, F, Args) ->
-    Ref = make_ref(),
-    Self = self(),
-    Pid = spawn( fun() ->
-                         receive
-                             Ref ->
-                                 apply(M, F, Args)
-                         end
-                 end ),
-    erlang:send_after(Time, Pid, Ref), 
-    ok.
+  Ref = make_ref(),
+  Self = self(),
+  Pid = spawn( fun() ->
+                   receive
+                     Ref ->
+                       apply(M, F, Args)
+                   end
+               end ),
+  erlang:send_after(Time, Pid, Ref), 
+  ok.
+
+%%% Local Variables:
+%%% erlang-indent-level: 2
+%%% End:
