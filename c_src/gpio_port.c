@@ -60,7 +60,7 @@ port_gpio_write (int pin, ETERM *valuet)
 int
 port_gpio_read (int pin)
 {
-	return gpio_read(pin);
+   return gpio_read(pin);
 }
 
 int
@@ -188,6 +188,18 @@ int main() {
                           resp = erl_format("{error, call_expected_tuple}");
                        }
                  
+                    }
+                    else if (strncmp(ERL_ATOM_PTR(fnp), "read", 4) == 0)
+                    {
+                       if((res =port_gpio_read(my_pin)) !=-1)
+                       {
+                          resp = erl_format("~i",res);
+                       }
+                       else
+                       {
+                          syslog(LOG_ERR, "port read failed");
+                          resp = erl_format("{error, gpio_read_failed}");
+                       }
                     }
                  }
                  else

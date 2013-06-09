@@ -160,7 +160,7 @@ handle_call(read, From, #state{direction=input,
                                pin=Pin,
                                pending=Pending,
                                port=Port}=State) ->
-  port_lib:call_to_port(Port, From, read),
+  port_lib:call_to_port(Port, From, {read}),
   NewPending = [From | Pending ],
   {noreply, State#state{pending=NewPending}};
 handle_call(read, _From, #state{direction=output}=State) ->
