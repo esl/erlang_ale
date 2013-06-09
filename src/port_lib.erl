@@ -3,21 +3,26 @@
 -export([load_driver/1,
          open_port/1,
          sync_call_to_port/2,
-         call_to_port/3]).
+         call_to_port/3,
+         cast_to_port/2]).
 
 
 open_port(SharedLib) ->
-    erlang:open_port({spawn,SharedLib}, []).
+    erlang:open_port({spawn,SharedLib}, [{packet, 2}, binary]).
 
 
 send_to_port(Owner, Port, Msg) ->
-    Port ! {Owner, {command, Msg}}.
-
+    %%    Bin = term_to_binary(Msg),
+    io:format("send_to_port: ~p~n", [Msg]),
+      Port ! {Owner, {command, term_to_binary(Msg)}}.
+%%    io:format("send_to_port: Bin=~p~n", [Bin]),
+%%    erlang:port_command(Port, Bin).
+    
 sync_call_to_port(Port, Msg) ->
     send_to_port(self(), Port, Msg),
     receive
         {Port, {data, Result}} ->
-            Result
+            binary_to_term(Result)
     end.
 
 %% @doc the response to this call has to be handled in the handle_info
@@ -26,6 +31,9 @@ sync_call_to_port(Port, Msg) ->
 call_to_port(Port, From, Msg) ->
     send_to_port(self(), Port, {call, From, Msg}).
 
+%% @doc used when no reply is needed from the port
+cast_to_port(Port, Msg) ->
+    send_to_port(self(), Port, {cast, Msg}).
 
 load_driver(SharedLib) ->
     case erl_ddll:load_driver(".", SharedLib) of

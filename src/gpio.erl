@@ -200,10 +200,11 @@ handle_call({from_port, {gpio_interrupt, Condition}=Msg},
   [ Pid ! Msg || Pid <- Pids ],
   Reply = ok,
   {reply, Reply, State};
-handle_call({from_port, {port_reply, To, Msg}},
+handle_call({from_port, {port_reply, To, Msg}}=FullMsg,
             _From,
             #state{pending=Pending}=State) ->
   %% @todo: should we do something if To is not in Pending list?
+  io:format("FullMsg=~p~n", [FullMsg]),
   NewPending = lists:delete(To, Pending),
   gen_server:reply(To, Msg),
   {reply, ok, State#state{pending=NewPending}}.
@@ -220,9 +221,9 @@ handle_info({Port, {data, Msg}},
   apply_after(0, ?MODULE, from_port, [Pin, Msg]),
   {noreply, State}.
 
-terminate(_Reason, #state{port=Port}=State) ->
+terminate(_Reason, #state{port=Port}=_State) ->
   %% the gproc entry is automatically removed.
-  ok = port_lib:sync_call_to_port(Port, release).
+  port_lib:cast_to_port(Port, release).
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
