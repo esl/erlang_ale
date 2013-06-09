@@ -21,8 +21,10 @@ send_to_port(Owner, Port, Msg) ->
 sync_call_to_port(Port, Msg) ->
     send_to_port(self(), Port, Msg),
     receive
-        {Port, {data, Result}} ->
-            binary_to_term(Result)
+        {Port, {data, BinResult}} ->
+            Result = binary_to_term(BinResult),
+            io:format("sync_call_to_port result: ~p~n", [Result]),
+            Result
     end.
 
 %% @doc the response to this call has to be handled in the handle_info

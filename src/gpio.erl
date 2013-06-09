@@ -218,7 +218,7 @@ handle_cast(_Msg, State) ->
 %% the from_port/2 function for all messages from the port. 
 handle_info({Port, {data, Msg}},
             #state{port=Port, pin=Pin}=State) ->
-  apply_after(0, ?MODULE, from_port, [Pin, Msg]),
+  apply_after(0, ?MODULE, from_port, [Pin, binary_to_term(Msg)]),
   {noreply, State}.
 
 terminate(_Reason, #state{port=Port}=_State) ->

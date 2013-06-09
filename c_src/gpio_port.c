@@ -24,17 +24,20 @@ port_gpio_init (ETERM *pin_t, ETERM *direction_t)
    int pin, dir;
    /* convert erlang terms to usable values */
    pin = ERL_INT_VALUE(pin_t);
+   syslog(LOG_NOTICE, "init with direction %s", ERL_ATOM_PTR(direction_t));
+   
    if (strncmp(ERL_ATOM_PTR(direction_t), "input", 5) == 0)
    {
-      dir = 0;
+      dir = 1;
    } else if (strncmp(ERL_ATOM_PTR(direction_t), "output", 6) == 0)
    {
-      dir = 1;
+      dir = 0;
    } else
    {
       return -1;
    }
 
+   syslog(LOG_NOTICE, "init with dir %d", dir);
    my_pin = pin;
       
    return gpio_init(pin, dir);
@@ -47,9 +50,11 @@ port_gpio_release (int pin)
 }
 
 int
-port_gpio_write (int pin, int value)
+port_gpio_write (int pin, ETERM *valuet)
 {
-	return gpio_write(pin, value);
+   int value;
+   value = ERL_INT_VALUE(valuet);
+   return gpio_write(pin, value);
 }
 
 int
@@ -70,15 +75,15 @@ port_gpio_set_int (int pin, int condition)
 /* MAIN */
 int main() {
   unsigned char buf[BUF_SIZE];
-  char command[MAXATOMLEN];
-  int index, version, arity;
+  /* char command[MAXATOMLEN]; */
+  /* int index, version, arity; */
 
 
-  ETERM *emsg, *msg_type, *fromp, *refp, *tuplep, *fnp, *arg1p, *arg2p, *resp;
+  ETERM *emsg, *msg_type, *refp, *tuplep, *fnp, *arg1p, *arg2p, *resp;
 
   
-  int arg1, arg2, res;
-  ei_x_buff result;
+  int res;
+  /* ei_x_buff result; */
 
   memset(buf, 0, BUF_SIZE);
   erl_init(NULL, 0);
@@ -126,8 +131,12 @@ int main() {
               else
               {
                  syslog(LOG_ERR,"init arguments incorrect");
+                 resp = erl_format("{error, gpio_init_wrong_arguments}");
               }
-                 
+              if (write_cmd_eterm(resp))
+                 syslog(LOG_NOTICE, "write_cmd_eterm done for init ");
+              else
+                 syslog(LOG_NOTICE, "write_cmd_eterm FAILED for init");
            }
            else if (strncmp(ERL_ATOM_PTR(msg_type), "cast", 4) == 0)
            {
@@ -137,33 +146,71 @@ int main() {
                  {
                     if (port_gpio_release(my_pin))
                     {
-                       resp= erl_format("ok");
+                       syslog(LOG_NOTICE, "gpio_relase went well for pin %d",
+                              my_pin);
                     }
                     else
                     {
-                       resp = erl_format("{error, gpio_release_fail}");
+                       syslog(LOG_ERR, "gpio_release failed for pin %d", my_pin);
                     }
                  }
               }
               else
               {
+                 syslog(LOG_ERR, "release arguments incorrect");
               }
            }
-           
+           else if (strncmp(ERL_ATOM_PTR(msg_type), "call", 4) == 0)
+           {
+              refp = erl_element(2, emsg);
+              tuplep = erl_element(3, emsg);
+              if (refp != NULL && tuplep != NULL)
+              {
+                 if ((fnp = erl_element(1, tuplep)) != NULL)
+                 {
+                    if (strncmp(ERL_ATOM_PTR(fnp), "write", 5) == 0)
+                    {
+                       if((arg1p = erl_element(2, tuplep)) != NULL)
+                       {
+                          if(port_gpio_write(my_pin, arg1p))
+                          {
+                             resp = erl_format("ok");
+                          }
+                          else
+                          {
+                             syslog(LOG_ERR, "port write failed");
+                             resp = erl_format("{error, gpio_write_failed}");
+                          }
+                       }
+                       else
+                       {
+                          syslog(LOG_ERR, "call with wrong tuple");
+                          resp = erl_format("{error, call_expected_tuple}");
+                       }
+                 
+                    }
+                 }
+                 else
+                 {
+                    syslog(LOG_ERR,"call arguments incorrect");
+                    resp = erl_format("{error, gpio_cal_wrong_arguments}");
+                 }
+              }
+              if (write_cmd_eterm(erl_format("{port_reply,~w,~w}", refp, resp)))
+              {
+                 syslog(LOG_NOTICE, "successful reply to call");
+              }
+              else
+              {
+                 syslog(LOG_ERR, "error write_cmd_eterm");
+              }
+           }
      }
      else
      {
         syslog(LOG_NOTICE, "erl_element FAILED!!!!");
         break;
      }
-     
-
-     syslog(LOG_NOTICE, "formatted resp");
-     
-     if (write_cmd_eterm(resp))
-        syslog(LOG_NOTICE, "write_cmd_eterm done");
-     else
-        syslog(LOG_NOTICE, "write_cmd_eterm FAILED");
   }
 
   syslog(LOG_NOTICE, "leaving gpio_port %d", res);
@@ -171,8 +218,8 @@ int main() {
   closelog();
 
   erl_free_term(emsg); erl_free_term(msg_type);
-  erl_free_term(fromp); erl_free_term(refp);
-  erl_free_term(tuplep); erl_free_term(fnp);
+  /* erl_free_term(fromp); erl_free_term(refp); */
+  /* erl_free_term(tuplep); erl_free_term(fnp); */
   erl_free_term(arg1p); erl_free_term(arg2p);
   erl_free_term(resp);
   
