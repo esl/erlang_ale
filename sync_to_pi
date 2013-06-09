@@ -1,2 +1,17 @@
 #!/bin/bash
-cd ..; rsync -avz --exclude '.git/*' --exclude 'erlhw/logs/*' --exclude 'erlhw/deps/*/logs/*' --exclude 'erlhw/priv/*' --exclude 'erlhw/ebin/*' --exclude '*.beam' erlhw /Users/th/RaspiBox/
+# inspired by http://rsync.samba.org/examples.html
+
+SDIR=../erlhw
+EXCLUDES=sync_excludes
+
+TDIR=RaspiBox
+TADDR=192.168.1.63
+TUSR=pi
+
+export RSYNC_PASSWORD=raspberry
+
+BACKUPDIR=`date +%C%y%m%d-%H%M`
+OPTS="--force --ignore-errors --exclude-from=$EXCLUDES 
+       -avz"
+
+rsync ${OPTS}  ${SDIR} ${TUSR}@${TADDR}:/${TDIR}
