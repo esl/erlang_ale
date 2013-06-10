@@ -194,9 +194,11 @@ handle_call({set_int, _Condition, _Requestor},
             #state{direction=output}=State) ->
   Reply = {error, setting_interrupt_on_output_pin},
   {reply, Reply, State};
-handle_call({from_port, {gpio_interrupt, Condition}=Msg},
+handle_call({from_port, {gpio_interrupt, Condition}},
             _From,
-            #state{interrupt={Condition, Pids}}=State) ->
+            #state{pin=Pin,
+                   interrupt={Condition, Pids}}=State) ->
+  Msg = {gpio_interrupt, Pin, Condition},
   [ Pid ! Msg || Pid <- Pids ],
   Reply = ok,
   {reply, Reply, State};

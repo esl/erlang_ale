@@ -16,6 +16,7 @@
 //int gpio_fd[64] = { -1 };
 
 static int my_pin;
+static ETERM *my_condition;
 
 // GPIO functions
 int
@@ -63,11 +64,32 @@ port_gpio_read (int pin)
    return gpio_read(pin);
 }
 
-int
-port_gpio_set_int (int pin, int condition)
+
+void
+gpio_isr(int pin)
 {
-	// TODO: Implement a pthread listener
-	return -1;
+   ETERM *resp = erl_format("{gpio_interrupt, ~w}", my_condition);
+
+   if (write_cmd_eterm(resp))
+   {
+      syslog(LOG_NOTICE, "gpio_interrupt for pin %d", pin);
+   }
+   else
+   {
+      syslog(LOG_ERR, "gpio_interrupt failed for pin %d", pin);
+   }
+      
+}
+
+int
+port_gpio_set_int (int pin, ETERM* condition_t)
+{
+   char mode[10];
+
+   my_condition = erl_format("~w", condition_t);
+   sprintf(mode, "%s", ERL_ATOM_PTR(condition_t));
+  
+   return gpio_set_int(pin, gpio_isr, mode);
 }
 
 
@@ -90,7 +112,7 @@ int main() {
   
 /*  setlogmask( LOG_UPTO (LOG_NOTICE));
  */ 
-  openlog("papged", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+  openlog("gpio_port", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 
   syslog(LOG_NOTICE, "openlog done");
   
@@ -201,6 +223,25 @@ int main() {
                           resp = erl_format("{error, gpio_read_failed}");
                        }
                     }
+                    else if (strncmp(ERL_ATOM_PTR(fnp), "set_int", 7) == 0)
+                    {
+                       if((arg1p = erl_element(2, tuplep)) != NULL)
+                       {
+                          if(port_gpio_set_int(my_pin, arg1p))
+                          {
+                             resp = erl_format("ok");
+                          }
+                          else
+                          {
+                             syslog(LOG_ERR, "port set_int failed");
+                             resp = erl_format("{error, gpio_set_int_failed}");
+                          }
+                       } else
+                       {
+                          syslog(LOG_ERR, "call with wrong tuple");
+                          resp = erl_format("{error, call_expected_tuple}");
+                       }
+                    }
                  }
                  else
                  {
@@ -208,6 +249,8 @@ int main() {
                     resp = erl_format("{error, gpio_cal_wrong_arguments}");
                  }
               }
+
+              /* Now we can send the response to the caller */
               if (write_cmd_eterm(erl_format("{port_reply,~w,~w}", refp, resp)))
               {
                  syslog(LOG_NOTICE, "successful reply to call");

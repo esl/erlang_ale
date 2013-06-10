@@ -41,12 +41,12 @@ start_link() ->
 %%%===================================================================
 
 init([]) ->
-    ok = gpio:pin_init_input(?UP_PIN),
-    ok = gpio:pin_init_input(?DOWN_PIN),
-    ok = gpio:pin_set_int(?UP_PIN, rising),
-    ok = gpio:pin_set_int(?DOWN_PIN, rising),
-    ok = gpio:pin_init_output(?ONES_PIN, false),
-    ok = gpio:pin_init_output(?TWOS_PIN, false),
+    {ok, _} = gpio:start_link(?UP_PIN, input),
+    {ok, _} = gpio:start_link(?DOWN_PIN, input),
+    ok = gpio:set_int(?UP_PIN, rising),
+    ok = gpio:set_int(?DOWN_PIN, rising),
+    {ok, _} = gpio:start_link(?ONES_PIN, output),
+    {ok, _} = gpio:start_link(?TWOS_PIN, output),
     {ok, #state{}}.
 
 handle_call(_Request, _From, State) ->
@@ -81,8 +81,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 set_counter_pins(N1) ->
     <<Twos:1, Ones:1>> = <<N1:2>>,
-    gpio:pin_write(?ONES_PIN, Ones),
-    gpio:pin_write(?TWOS_PIN, Twos).
+    gpio:write(?ONES_PIN, Ones),
+    gpio:write(?TWOS_PIN, Twos).
 
 
 
