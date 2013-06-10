@@ -1,5 +1,0 @@
-*/logs/*
-*/deps/*/logs/*
-*/priv/*
-*/ebin/*
-*.beam
