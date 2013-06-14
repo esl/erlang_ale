@@ -30,17 +30,16 @@ $(PIHWMLIB):
 
 #build: rebar_plugin
 build: 
-	rebar compile
+	./rebar compile
 
 #rebar_plugin: plugins/compile-deps/src/rebar_compiledeps_plugin.beam
 
 #plugins/compile-deps/src/%.beam: plugins/compile-deps/src/%.erl
 #	erlc -o plugins/compile-deps/src $<
 
-build_pihwm:
-	gcc 
+
 build_sim:
-	rebar -D simulation_mode  compile
+	./rebar -D simulation_mode  compile
 
 build_examples:
 	erlc -o examples examples/*.erl
