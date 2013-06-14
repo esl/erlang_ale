@@ -18,7 +18,7 @@ LDFLAGS=-L. -L$(ERL_LIB)/lib -Ldeps/pihwm/lib -Lpriv
 
 PIHWMLIB = pihwm pi_gpio 
 
-all: init library gpio_port build
+all: library gpio_port build
 
 init:
 	mkdir -p priv
@@ -48,7 +48,7 @@ build_examples:
 	erlc -o examples examples/*.erl
 
 shell: 
-	erl  -sname e1 -setcookie secretcookie -pz deps/*/ebin -pz ebin -pz examples
+	sudo erl  -sname e1 -setcookie secretcookie -pz deps/*/ebin -pz ebin -pz examples
 
 test:
 	ct_run -noshell -pa deps/*/ebin -pa ebin -sname ct -env TEST_DIR test -dir test
