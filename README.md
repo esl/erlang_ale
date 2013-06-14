@@ -20,7 +20,7 @@ in due course.
 
 Log in to your Pi and fetch the latest version of ALE using git:
 
-    git pull 
+    git clone https://github.com/esl/erlang-ale.git
 
 Let rebar (bundled) fetch the dependencies for you:
 
