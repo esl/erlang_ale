@@ -18,8 +18,11 @@ LDFLAGS=-L. -L$(ERL_LIB)/lib -Ldeps/pihwm/lib -Lpriv
 
 PIHWMLIB = pihwm pi_gpio 
 
+all: init library gpio_port build
 
-all:	library gpio_port build
+init:
+	mkdir -p priv
+	./rebar get-deps
 
 library: $(PIHWMLIB)
 
