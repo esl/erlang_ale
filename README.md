@@ -20,7 +20,7 @@ in due course.
 
 Log in to your Pi and fetch the latest version of ALE using git:
 
-    git pull 
+    git clone https://github.com/esl/erlang-ale.git
 
 Let rebar (bundled) fetch the dependencies for you:
 
@@ -51,7 +51,7 @@ Turn it on:
     gpio:write(23, 1).    
 
 A more detailed usage of the GPIO module can be found in
-`exercises/gpio_counter.erl`
+`examples/gpio_counter.erl`
 
 
 # Comments and suggestions
@@ -61,7 +61,7 @@ A more detailed usage of the GPIO module can be found in
 
 # License
 
-    erlang-ale  is licensed under the Apache License, Version 2.0 (the "License");
+    erlang-ale is licensed under the Apache License, Version 2.0 (the "License");
     You may not use this library except in compliance with the License.
     You may obtain a copy of the License at
 
