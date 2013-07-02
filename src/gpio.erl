@@ -157,7 +157,6 @@ handle_call({write, _Value}, _From, #state{direction=input}=State) ->
   Reply = {error, writing_to_input_pin},
   {reply, Reply, State};
 handle_call(read, From, #state{direction=input,
-                               pin=Pin,
                                pending=Pending,
                                port=Port}=State) ->
   port_lib:call_to_port(Port, From, {read}),
@@ -183,7 +182,7 @@ handle_call({set_int, Condition, Requestor},
   Reply = ok,
   Interrupt = {Condition, [Requestor|Pids]},
   {reply, Reply, State#state{interrupt=Interrupt}};
-handle_call({set_int, Condition, Requestor},
+handle_call({set_int, _Condition, _Requestor},
             _From,
             #state{direction=input,
                    interrupt={_,_}}=State) ->
@@ -220,7 +219,7 @@ handle_cast(_Msg, State) ->
 %% the from_port/2 function for all messages from the port. 
 handle_info({Port, {data, Msg}},
             #state{port=Port, pin=Pin}=State) ->
-  apply_after(0, ?MODULE, from_port, [Pin, binary_to_term(Msg)]),
+  timer:apply_after(0, ?MODULE, from_port, [Pin, binary_to_term(Msg)]),
   {noreply, State}.
 
 terminate(_Reason, #state{port=Port}=_State) ->
@@ -242,34 +241,13 @@ pname(Pin) ->
 
 
 %% @doc value_change(Old, New)
-value_change(0, 1) ->
-  raising;
-value_change(1, 0) ->
-  falling;
-value_change(_, _) ->
-  no_change.
+%% value_change(0, 1) ->
+%%   raising;
+%% value_change(1, 0) ->
+%%   falling;
+%% value_change(_, _) ->
+%%   no_change.
 
-
-
-
-
-
-
-
-
-
-
-apply_after(Time, M, F, Args) ->
-  Ref = make_ref(),
-  Self = self(),
-  Pid = spawn( fun() ->
-                   receive
-                     Ref ->
-                       apply(M, F, Args)
-                   end
-               end ),
-  erlang:send_after(Time, Pid, Ref), 
-  ok.
 
 %%% Local Variables:
 %%% erlang-indent-level: 2
