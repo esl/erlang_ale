@@ -1,6 +1,10 @@
 -module(pubsub).
 
--compile(export_all).
+%% todo: must export sensible set the day we need these functions.
+-export([set_interrupt/2,
+         simulate_interrupt/2,
+         pin_interrupts/1]).
+          
 
 %% @doc set_interrupt will create an interrupt for pin N on the
 %% condition C.
