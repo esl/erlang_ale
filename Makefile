@@ -69,9 +69,6 @@ clean_ct:
 	rm -rf jquery*
 	rm -rf variables*@*
 
-clean:
-	rm -rf ebin/*.beam test/*.beam priv/*
-
 priv/%.o: c_src/%.c
 	$(CC) -g $(CFLAGS) -c -o $@ $<
 
