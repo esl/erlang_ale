@@ -75,4 +75,4 @@ clean:
 priv/%.o: c_src/%.c
 	$(CC) -g $(CFLAGS) -c -o $@ $<
 
-.PHONY all library init shell
+.PHONY: all library init shell
