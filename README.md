@@ -22,11 +22,8 @@ Log in to your Pi and fetch the latest version of ALE using git:
 
     git clone https://github.com/esl/erlang-ale.git
 
-Let rebar (bundled) fetch the dependencies for you:
 
-    make init
-
-Build the external interfaces:
+Fetch the dependencies and build erlang-ale:
 
     make
 
