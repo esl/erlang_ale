@@ -9,12 +9,14 @@
 
 -onload([load_nif/0]).
 
+-define(NIF_PWM_LIB, "../priv/pwm_nif").
+
 %% @doc Load the PWM C library.
 %% @end
 -spec(load_nif() -> ok | {error, error_type}).
 
 load_nif() ->
-    ok = erlang:load_nif("./pwm_nif", 0).
+    ok = erlang:load_nif(?NIF_PWM_LIB, 0).
 
 %% @doc Initialise the PWM peripheral.
 %% @end
