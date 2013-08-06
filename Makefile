@@ -38,7 +38,7 @@ LDFLAGS=-L. -L$(ERL_LIB)/lib -Ldeps/pihwm/lib -Lpriv
 
 all: init library
 
-library: gpio_port examples
+library: gpio_port pwm_nif examples
 
 init:
 	mkdir -p priv
@@ -48,6 +48,9 @@ gpio_port: priv/gpio_port.o deps/erlang_portutil/port_comms.o
 
 gpio_test: priv/gpio_test.o
 	$(CC) $(LDFLAGS) $< pihwm.o pi_gpio.o -lpthread -o $@
+
+pwm_nif:
+	$(CC) $(LDFLAGS) $< -o priv/pwm_nif.so -fpic -shared c_src/pwm_nif.c deps/pihwm/lib/pihwm.c deps/pihwm/lib/pi_pwm.c
 
 examples:
 	erlc -o examples examples/*.erl
