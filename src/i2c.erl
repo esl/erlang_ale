@@ -11,7 +11,7 @@
 	 terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE). 
--define (I2CLIBRARY, "./i2c_lib").
+-define (I2CLIBRARY, "../priv/i2c_lib").
 
 
 %%%===================================================================
@@ -81,7 +81,7 @@ handle_call({call, i2c_init}, _From, State) ->
 	-1 ->
 	    Reply = {error, i2c_initialization_error};
 	Reply ->
-	    Reply
+	    ok
     end,
     {reply, Reply, State};
 
