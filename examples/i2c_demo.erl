@@ -1,3 +1,9 @@
+%%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
+%%% @copyright (C) 2013, Erlang Solutions Ltd
+%%% @doc Sends and receives data to/from MCP23008 port expander through the I2C bus.
+%%%      It reads the state of DIP Switch pins and turn on some led.
+%%% @end
+
 -module(i2c_demo).
 
 -export([init/0, run_demo/0, start/2, stop/1]).
@@ -8,21 +14,23 @@
 
 init() ->
     i2c:start_link(),
-    %% initialise i2c bus
+    %% initialize i2c bus
     Fd = i2c:i2c_init(),
     %% set pin directions
     i2c:i2c_write(Fd, ?ADDR, {?IODIR, 16#f}, 2),
     %% reset pin value
     i2c:i2c_write(Fd, ?ADDR, {?GPIO, 0}, 2),
     Fd.
-    
+
+%% Runs the demo
 run_demo() ->
     Fd = init(),
     start(Fd, 0),
     stop(Fd).
 
+%% Main function
 start(Fd, Count) when Count < 16 ->
-    %% set led state
+    %% turn on the led
     i2c:i2c_write(Fd, ?ADDR, {?GPIO, Count bsl 4}, 2),
     timer:sleep(1000),
     

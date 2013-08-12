@@ -1,3 +1,8 @@
+%%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
+%%% @copyright (C) 2013, Erlang Solutions Ltd
+%%% @doc This module allow to use erlang/ALE to send and receive data through i2c bus.
+%%% @end
+
 -module(i2c).
 
 -behaviour(gen_server).
@@ -13,6 +18,10 @@
 -define(SERVER, ?MODULE). 
 -define (I2CLIBRARY, "../priv/i2c_lib").
 
+-type fd() :: integer().
+-type addr() :: integer().
+-type data() :: tuple().
+-type len() :: integer().
 
 %%%===================================================================
 %%% API
@@ -31,13 +40,23 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
+%% @doc Initialise the i2c bus.
+%% @end
+-spec(i2c_init() -> fd() | {error, error_type}).
 i2c_init() ->
     gen_server:call(?MODULE, {call, i2c_init}).
 %%    call(i2c_init).
 
+%% @doc sends data to an i2c slave device.
+%% @end
+
+-spec(i2c_write(fd(), addr(), data(), len()) -> ok | {error, error_type}).
 i2c_write(Fd, Addr, Data, Len) ->
     gen_server:call(?MODULE, {call, i2c_write, Fd, Addr, Data, Len}).
 
+%% @doc read data from an i2c slave device.
+%% @end
+-spec(i2c_read(fd(), addr(), len()) -> {data()} | {error, error_type}).
 i2c_read(Fd, Addr, Len) ->
     gen_server:call(?MODULE, {call, i2c_read, Fd, Addr, Len}).
 

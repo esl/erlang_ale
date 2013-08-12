@@ -1,4 +1,9 @@
-/* i2c_ei.c */
+/**
+* @file   i2c_ei.c
+* @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
+* @brief  i2c erlang interface
+**/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "erl_interface.h"
@@ -6,9 +11,10 @@
 
 typedef unsigned char byte;
 
-
+// data buffer
 unsigned char *data;
 
+//convert an erlang tuple in an array
 void tuple_to_array(ETERM *tuple) {
 
   int tplsize = ERL_TUPLE_SIZE(tuple);
@@ -35,7 +41,7 @@ int main() {
     fnp = erl_element(1, tuplep);
     argp = erl_element(2, tuplep);
     
-
+    // calls the i2c_init function and returns the fd or -1
     if (strncmp(ERL_ATOM_PTR(fnp), "i2c_init", 8) == 0) {
       res = i2c_init();
       if (res < 0) {
@@ -45,11 +51,13 @@ int main() {
 	intp = erl_mk_int(res);
       }
     }
+    // calls the i2c_write function and return ok 1 if success or -1 if fails
     else if (strcmp(ERL_ATOM_PTR(fnp), "i2c_write", 9) == 0) {
       tuple_to_array(erl_element(4, tuplep));
       res = i2c_write(ERL_INT_VALUE(erl_element(2,tuplep)), ERL_INT_VALUE(erl_element(3, tuplep)), data, ERL_INT_VALUE(erl_element(5, tuplep)));
       intp = erl_mk_int(res);
     }
+    // calls the i2c_read function and return an erlang tuple with data or -1 if fails
     else if (strncmp(ERL_ATOM_PTR(fnp), "i2c_read", 8) == 0) {
       int size = ERL_INT_VALUE(erl_element(4, tuplep));
       data=(char *) malloc (size * sizeof (char));
@@ -59,6 +67,7 @@ int main() {
       if (res < 0) {
 	intp=erl_mk_int(-1);
       }
+      // convert data array in an erlang tuple
       else {       
 	ETERM *etermarray[size];
 	int i=0;
