@@ -49,9 +49,31 @@ gpio_port: priv/gpio_port.o deps/erlang_portutil/port_comms.o
 gpio_test: priv/gpio_test.o
 	$(CC) $(LDFLAGS) $< pihwm.o pi_gpio.o -lpthread -o $@
 
+# PWM
 pwm_nif:
 	$(CC) $(LDFLAGS) $< -o priv/pwm_nif.so -fpic -shared c_src/pwm_nif.c deps/pihwm/lib/pihwm.c deps/pihwm/lib/pi_pwm.c
 
+pwm: pwm_nif
+	erlc -o ./ebin src/pwm.erl
+
+# I2C
+erl_comm.o: c_src/erl_comm.c
+	$(CC) -c c_src/erl_comm.c -o priv/erl_comm.o
+
+i2c_ei.o: c_src/i2c_ei.c
+	$(CC) -c c_src/i2c_ei.c -o priv/i2c_ei.o
+
+i2c_lib: i2c_ei.o erl_comm.o
+	$(CC) -o priv/i2c_lib -I$(ERL_LIB)/include -lpthread -L$(ERL_LIB)/lib priv/i2c_ei.o priv/erl_comm.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_i2c.o -lerl_interface -lei 
+	rm -rf priv/i2c_ei.o priv/erl_comm.o
+
+port_lib.beam:
+	erlc -o ./ebin src/port_lib.erl
+
+i2c: i2c_lib port_lib.beam
+	erlc -o ./ebin src/i2c.erl
+
+# EXAMPLE
 examples:
 	erlc -o examples examples/*.erl
 
