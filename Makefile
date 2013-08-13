@@ -38,10 +38,10 @@ LDFLAGS=-L. -L$(ERL_LIB)/lib -Ldeps/pihwm/lib -Lpriv
 
 all: init library
 
-library: gpio_port pwm_nif examples
+library: gpio_port pwm_nif i2c_lib examples
 
 init:
-	mkdir -p priv
+	mkdir -p priv ebin
 
 gpio_port: priv/gpio_port.o deps/erlang_portutil/port_comms.o
 	$(CC)  ${LDFLAGS} deps/erlang_portutil/port_comms.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_gpio.o  priv/gpio_port.o -lerl_interface -lei -lpthread -o priv/gpio_port
