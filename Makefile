@@ -71,7 +71,7 @@ port_lib.beam:
 	erlc -o ./ebin src/port_lib.erl
 
 i2c: i2c_lib port_lib.beam
-	erlc -o ./ebin src/i2c.erl
+	erlc -o ./ebin src/i2c.erl src/i2c_sup.erl
 
 # EXAMPLE
 examples:
