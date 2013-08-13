@@ -8,8 +8,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, stop/0]).
--export([i2c_init/0, i2c_init_name/1, i2c_write/4, i2c_read/3]).
+-export([start_link/1, stop/1]).
+-export([i2c_init/1, i2c_init_name/2, i2c_write/5, i2c_read/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -23,6 +23,7 @@
 -type data() :: tuple().
 -type len() :: integer().
 -type devname() :: string().
+-type channel() :: atom().
 
 %%%===================================================================
 %%% API
@@ -35,35 +36,35 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Channel) ->
+    gen_server:start_link({local, Channel}, ?MODULE, [], []).
 
-stop() ->
-    gen_server:cast(?MODULE, stop).
+stop(Channel) ->
+    gen_server:cast(Channel, stop).
 
-%% @doc Initialise the i2c bus.
+%% @doc Initialize the i2c bus.
 %% @end
--spec(i2c_init() -> fd() | {error, error_type}).
-i2c_init() ->
-    gen_server:call(?MODULE, {call, i2c_init}).
+-spec(i2c_init(channel()) -> fd() | {error, error_type}).
+i2c_init(Channel) ->
+    gen_server:call(Channel, {call, i2c_init}).
 
-%% @doc Initialise the i2c devname device.
+%% @doc Initialize the i2c devname device.
 %% @end
--spec(i2c_init_name(devname()) -> fd() | {error, error_type}).
-i2c_init_name(Devname) ->
-    gen_server:call(?MODULE, {call, i2c_init_name, Devname}).
+-spec(i2c_init_name(channel(), devname()) -> fd() | {error, error_type}).
+i2c_init_name(Channel, Devname) ->
+    gen_server:call(Channel, {call, i2c_init_name, Devname}).
 
 %% @doc write data into an i2c slave device.
 %% @end
--spec(i2c_write(fd(), addr(), data(), len()) -> ok | {error, error_type}).
-i2c_write(Fd, Addr, Data, Len) ->
-    gen_server:call(?MODULE, {call, i2c_write, Fd, Addr, Data, Len}).
+-spec(i2c_write(channel(), fd(), addr(), data(), len()) -> ok | {error, error_type}).
+i2c_write(Channel, Fd, Addr, Data, Len) ->
+    gen_server:call(Channel, {call, i2c_write, Fd, Addr, Data, Len}).
 
 %% @doc read data from an i2c slave device.
 %% @end
--spec(i2c_read(fd(), addr(), len()) -> {data()} | {error, error_type}).
-i2c_read(Fd, Addr, Len) ->
-    gen_server:call(?MODULE, {call, i2c_read, Fd, Addr, Len}).
+-spec(i2c_read(channel(), fd(), addr(), len()) -> {data()} | {error, error_type}).
+i2c_read(Channel, Fd, Addr, Len) ->
+    gen_server:call(Channel, {call, i2c_read, Fd, Addr, Len}).
 
 %%%===================================================================
 %%% gen_server callbacks
