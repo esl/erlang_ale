@@ -42,8 +42,18 @@ int main() {
     argp = erl_element(2, tuplep);
     
     // calls the i2c_init function and returns the fd or -1
-    if (strncmp(ERL_ATOM_PTR(fnp), "i2c_init", 8) == 0) {
+    if (strncmp(ERL_ATOM_PTR(fnp), "i2c_init", 13) == 0) {
       res = i2c_init();
+      if (res < 0) {
+	intp = erl_mk_int(-1);
+      }
+      else {
+	intp = erl_mk_int(res);
+      }
+    }
+    // calls the i2c_init_name function and returns the fd or -1
+    else if (strcmp(ERL_ATOM_PTR(fnp), "i2c_init_name", 13) == 0) {
+      res = i2c_init_name(erl_iolist_to_string(erl_element(2, tuplep)));
       if (res < 0) {
 	intp = erl_mk_int(-1);
       }
