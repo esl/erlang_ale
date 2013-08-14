@@ -6,7 +6,7 @@
 
 #include <erl_interface.h>
 #include <ei.h>
-#include <port_comms.h>
+#include <portutil.h>
 #include <pihwm.h>
 #include <pi_gpio.h>
 
