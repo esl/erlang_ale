@@ -38,7 +38,7 @@ LDFLAGS=-L. -L$(ERL_LIB)/lib -Ldeps/pihwm/lib -Lpriv
 
 all: init library
 
-library: gpio_port pwm_nif i2c_lib examples
+library: gpio_port pwm_nif i2c_lib spi_lib examples
 
 init:
 	mkdir -p priv ebin
@@ -72,6 +72,17 @@ port_lib.beam:
 
 i2c: i2c_lib port_lib.beam
 	erlc -o ./ebin src/i2c.erl src/i2c_sup.erl
+
+# SPI
+spi_ei.o: c_src/spi_ei.c
+	$(CC) -c c_src/spi_ei.c -o priv/spi_ei.o
+
+spi_lib: spi_ei.o erl_comm.o
+	$(CC) -o priv/spi_lib -I$(ERL_LIB)/include -lpthread -L$(ERL_LIB)/lib priv/spi_ei.o priv/erl_comm.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_spi.o -lerl_interface -lei
+	rm -rf priv/spi_ei.o priv/erl_comm.o
+
+spi: spi_lib port_lib.beam
+	erlc -o ./ebin src/spi.erl src/spi_sup.erl
 
 # EXAMPLE
 examples:
