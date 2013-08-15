@@ -15,7 +15,7 @@
 -define(SPIDELAY, 10).
 
 init() ->
-    spi_sup:start_link([{?SPICHANNEL, "/dev/spidev0.0"}]),
+    spi_sup:start_link([{?SPICHANNEL, "/dev/spidev0.0"}]),   
     spi:config(?SPICHANNEL, ?SPIMODE, ?SPIBPW, ?SPISPEED, ?SPIDELAY).
 
 run_demo() ->

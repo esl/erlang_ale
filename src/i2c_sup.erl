@@ -16,7 +16,8 @@
 -define(SERVER, ?MODULE).
 
 -type channel() :: atom().
--type chnlist() :: list(channel()).
+-type devname() :: string().
+-type chnlist() :: list({channel(), devname()}).
 
 %%%===================================================================
 %%% API functions
@@ -29,6 +30,7 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec(start_link(chnlist()) -> {ok, pid()} | {error, reason}).
 start_link(Chnlist) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, Chnlist).
 

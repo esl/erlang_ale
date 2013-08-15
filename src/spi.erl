@@ -38,6 +38,7 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
     gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
@@ -46,13 +47,13 @@ stop(Channel) ->
 
 %% @doc SPI configuration.
 %% @end
--spec(config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, error_type}).
+-spec(config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, reason}).
 config(Channel, Mode, Bits, Speed, Delay) ->
     gen_server:call(Channel, {call, config, Mode, Bits, Speed, Delay}).
 
 %% @doc SPI transfer.
 %% @end
--spec(transfer(channel(), data(), len()) -> {data()} | {error, error_type}).
+-spec(transfer(channel(), data(), len()) -> {data()} | {error, reason}).
 transfer(Channel, Data, Len) ->
     gen_server:call(Channel, {call, transfer, Data, Len}).
 
@@ -134,10 +135,6 @@ handle_cast(stop, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({State, {data, Data}}, State) ->
-    io:format("Message received: ~p~n",[binary_to_term(Data)]),
-    {noreply, State};
-
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -175,7 +172,7 @@ code_change(_OldVsn, State, _Extra) ->
 spi_init(Port, Devname) ->
     case port_lib:sync_call_to_port(Port, {spi_init, Devname}) < 0 of
 	true ->
-	    {error, spi_initialization_error};
+	    exit({error, spi_initialization_error});
 	false ->
 	    ok
     end.

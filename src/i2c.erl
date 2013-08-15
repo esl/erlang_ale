@@ -35,6 +35,7 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
     gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
@@ -43,13 +44,13 @@ stop(Channel) ->
 
 %% @doc write data into an i2c slave device.
 %% @end
--spec(write(channel(), addr(), data(), len()) -> ok | {error, error_type}).
+-spec(write(channel(), addr(), data(), len()) -> ok | {error, reason}).
 write(Channel, Addr, Data, Len) ->
     gen_server:call(Channel, {call, write, Addr, Data, Len}).
 
 %% @doc read data from an i2c slave device.
 %% @end
--spec(read(channel(), addr(), len()) -> {data()} | {error, error_type}).
+-spec(read(channel(), addr(), len()) -> {data()} | {error, reason}).
 read(Channel, Addr, Len) ->
     gen_server:call(Channel, {call, read, Addr, Len}).
 
@@ -131,10 +132,6 @@ handle_cast(stop, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({State, {data, Data}}, State) ->
-    io:format("Message received: ~p~n",[binary_to_term(Data)]),
-    {noreply, State};
-
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -172,7 +169,7 @@ code_change(_OldVsn, State, _Extra) ->
 i2c_init(Port, Devname) ->
     case port_lib:sync_call_to_port(Port, {i2c_init, Devname}) < 0 of
 	true ->
-	    {error, i2c_initialization_error};
+	    exit({error, i2c_initialization_error});
 	false ->
 	    ok
     end.
