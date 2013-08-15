@@ -34,6 +34,8 @@ int main() {
   byte buf[100];
   long allocated, freed;
 
+  int fd;
+
   erl_init(NULL, 0);
 
   while (read_cmd(buf) > 0) {
@@ -44,6 +46,7 @@ int main() {
     // calls the i2c_init function and returns the fd or -1
     if (strncmp(ERL_ATOM_PTR(fnp), "i2c_init", 13) == 0) {
       res = i2c_init();
+      fd=res;
       if (res < 0) {
 	intp = erl_mk_int(-1);
       }
@@ -54,6 +57,7 @@ int main() {
     // calls the i2c_init_name function and returns the fd or -1
     else if (strcmp(ERL_ATOM_PTR(fnp), "i2c_init_name", 13) == 0) {
       res = i2c_init_name(erl_iolist_to_string(erl_element(2, tuplep)));
+      fd=res;
       if (res < 0) {
 	intp = erl_mk_int(-1);
       }
@@ -61,18 +65,18 @@ int main() {
 	intp = erl_mk_int(res);
       }
     }
-    // calls the i2c_write function and return ok 1 if success or -1 if fails
+    // calls the i2c_write function and return 1 if success or -1 if fails
     else if (strcmp(ERL_ATOM_PTR(fnp), "i2c_write", 9) == 0) {
-      tuple_to_array(erl_element(4, tuplep));
-      res = i2c_write(ERL_INT_VALUE(erl_element(2,tuplep)), ERL_INT_VALUE(erl_element(3, tuplep)), data, ERL_INT_VALUE(erl_element(5, tuplep)));
+      tuple_to_array(erl_element(3, tuplep));
+      res = i2c_write(fd, ERL_INT_VALUE(erl_element(2, tuplep)), data, ERL_INT_VALUE(erl_element(4, tuplep)));
       intp = erl_mk_int(res);
     }
     // calls the i2c_read function and return an erlang tuple with data or -1 if fails
     else if (strncmp(ERL_ATOM_PTR(fnp), "i2c_read", 8) == 0) {
-      int size = ERL_INT_VALUE(erl_element(4, tuplep));
+      int size = ERL_INT_VALUE(erl_element(3, tuplep));
       data=(char *) malloc (size * sizeof (char));
 
-      res = i2c_read(ERL_INT_VALUE(erl_element(2, tuplep)), ERL_INT_VALUE(erl_element(3, tuplep)), data, ERL_INT_VALUE(erl_element(4, tuplep)));
+      res = i2c_read(fd, ERL_INT_VALUE(erl_element(2, tuplep)), data, size);
 
       if (res < 0) {
 	intp=erl_mk_int(-1);
