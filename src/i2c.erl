@@ -9,7 +9,7 @@
 
 %% API
 -export([start_link/1, stop/1]).
--export([i2c_init/1, i2c_init_name/2, i2c_write/4, i2c_read/3]).
+-export([i2c_init/2, i2c_write/4, i2c_read/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -41,17 +41,11 @@ start_link(Channel) ->
 stop(Channel) ->
     gen_server:cast(Channel, stop).
 
-%% @doc Initialize the i2c bus.
-%% @end
--spec(i2c_init(channel()) -> ok | {error, error_type}).
-i2c_init(Channel) ->
-    gen_server:call(Channel, {call, i2c_init}).
-
 %% @doc Initialize the i2c devname device.
 %% @end
--spec(i2c_init_name(channel(), devname()) -> ok | {error, error_type}).
-i2c_init_name(Channel, Devname) ->
-    gen_server:call(Channel, {call, i2c_init_name, Devname}).
+-spec(i2c_init(channel(), devname()) -> ok | {error, error_type}).
+i2c_init(Channel, Devname) ->
+    gen_server:call(Channel, {call, i2c_init, Devname}).
 
 %% @doc write data into an i2c slave device.
 %% @end
@@ -99,17 +93,8 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({call, i2c_init}, _From, State) ->
-    case port_lib:sync_call_to_port(State, {i2c_init}) < 0 of
-	true ->
-	    Reply = {error, i2c_initialization_error};
-	false ->
-	    Reply = ok
-    end,
-    {reply, Reply, State};
-
-handle_call({call, i2c_init_name, Devname}, _From, State) ->
-    case port_lib:sync_call_to_port(State, {i2c_init_name, Devname}) < 0 of
+handle_call({call, i2c_init, Devname}, _From, State) ->
+    case port_lib:sync_call_to_port(State, {i2c_init, Devname}) < 0 of
 	true ->
 	    Reply = {error, i2c_initialization_error};
 	false ->

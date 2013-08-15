@@ -18,7 +18,7 @@ init() ->
     %% starts the supervisor
     i2c_sup:start_link([?I2C_CHANNEL]),
     %% initialize i2c bus
-    i2c:i2c_init(?I2C_CHANNEL),
+    i2c:i2c_init(?I2C_CHANNEL, "/dev/i2c-1"),
     %% set pin directions
     i2c:i2c_write(?I2C_CHANNEL, ?ADDR, {?IODIR, 16#f}, 2),
     %% reset pin value
