@@ -13,17 +13,17 @@
 typedef unsigned char byte;
 
 // data buffer
-unsigned char *txbuf;
+uint8_t *txbuf;
 
 //convert an erlang tuple in an array
 void tuple_to_array(ETERM *tuple) {
 
   int tplsize = ERL_TUPLE_SIZE(tuple);
 
-  txbuf=(char *) malloc (tplsize * sizeof (char));
+  txbuf=(uint8_t *) malloc (tplsize * sizeof (uint8_t));
   int i=0;
   for (i=0; i<tplsize; i++) {
-    txbuf[i]=(char) ERL_INT_VALUE(erl_element(i+1, tuple));
+    txbuf[i]=(uint8_t) ERL_INT_VALUE(erl_element(i+1, tuple));
   }
 }
 
