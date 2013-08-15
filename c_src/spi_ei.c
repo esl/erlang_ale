@@ -46,8 +46,8 @@ int main() {
     
     // calls the spi_init_name function and returns the fd or -1
     if (strcmp(ERL_ATOM_PTR(fnp), "spi_init", 8) == 0) {
-      //      res = spi_init(erl_iolist_to_string(erl_element(2, tuplep)));
-      res = spi_init(ERL_INT_VALUE(erl_element(2, tuplep)));
+      res = spi_init_name(erl_iolist_to_string(erl_element(2, tuplep)));
+      //      res = spi_init(ERL_INT_VALUE(erl_element(2, tuplep)));
       fd = res;
       if (res < 0) {
 	intp = erl_mk_int(-1);

@@ -24,8 +24,7 @@
 -type delay() :: integer().
 -type speed() :: integer().
 -type len() :: integer().
-%%-type devname() :: string().
--type devname() :: integer().
+-type devname() :: string().
 -type channel() :: atom().
 
 %%%===================================================================
@@ -45,7 +44,7 @@ start_link(Channel) ->
 stop(Channel) ->
     gen_server:cast(Channel, stop).
 
-%% @doc Initialize the SPI bus.
+%% @doc Initialize the SPI devname device.
 %% @end
 -spec(spi_init(channel(), devname()) -> ok | {error, error_type}).
 spi_init(Channel, Devname) ->

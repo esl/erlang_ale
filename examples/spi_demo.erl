@@ -16,7 +16,7 @@
 
 init() ->
     spi_sup:start_link([?SPICHANNEL]),
-    spi:spi_init(?SPICHANNEL, 0),
+    spi:spi_init(?SPICHANNEL, "/dev/spidev0.0"),
     spi:spi_config(?SPICHANNEL, ?SPIMODE, ?SPIBPW, ?SPISPEED, ?SPIDELAY).
 
 run_demo() ->
