@@ -9,7 +9,7 @@
 
 %% API
 -export([start_link/1, stop/1]).
--export([spi_init/2, spi_config/5, spi_transfer/3]).
+-export([config/5, transfer/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -38,29 +38,23 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link(Channel) ->
-    gen_server:start_link({local, Channel}, ?MODULE, [], []).
+start_link({Channel, Devname}) ->
+    gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
 stop(Channel) ->
     gen_server:cast(Channel, stop).
 
-%% @doc Initialize the SPI devname device.
-%% @end
--spec(spi_init(channel(), devname()) -> ok | {error, error_type}).
-spi_init(Channel, Devname) ->
-    gen_server:call(Channel, {call, spi_init, Devname}).
-
 %% @doc SPI configuration.
 %% @end
--spec(spi_config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, error_type}).
-spi_config(Channel, Mode, Bits, Speed, Delay) ->
-    gen_server:call(Channel, {call, spi_config, Mode, Bits, Speed, Delay}).
+-spec(config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, error_type}).
+config(Channel, Mode, Bits, Speed, Delay) ->
+    gen_server:call(Channel, {call, config, Mode, Bits, Speed, Delay}).
 
 %% @doc SPI transfer.
 %% @end
--spec(spi_transfer(channel(), data(), len()) -> {data()} | {error, error_type}).
-spi_transfer(Channel, Data, Len) ->
-    gen_server:call(Channel, {call, spi_transfer, Data, Len}).
+-spec(transfer(channel(), data(), len()) -> {data()} | {error, error_type}).
+transfer(Channel, Data, Len) ->
+    gen_server:call(Channel, {call, transfer, Data, Len}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -77,9 +71,9 @@ spi_transfer(Channel, Data, Len) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
+init(Devname) ->
     Port = open_port({spawn, ?SPILIBRARY}, [{packet, 2}, binary]),
-%    i2c_init(),
+    spi_init(Port, Devname),
     {ok, Port}.
 
 %%--------------------------------------------------------------------
@@ -96,16 +90,7 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({call, spi_init, Devname}, _From, State) ->
-    case port_lib:sync_call_to_port(State, {spi_init, Devname}) < 0 of
-	true ->
-	    Reply = {error, spi_initialization_error};
-	false ->
-	    Reply = ok
-    end,
-    {reply, Reply, State};
-
-handle_call({call, spi_config, Mode, Bits, Speed, Delay}, _From, State) ->
+handle_call({call, config, Mode, Bits, Speed, Delay}, _From, State) ->
     case port_lib:sync_call_to_port(State, {spi_config, Mode, Bits, Speed, Delay}) < 0 of
 	true ->
 	    Reply = {error, spi_configuration_error};
@@ -114,7 +99,7 @@ handle_call({call, spi_config, Mode, Bits, Speed, Delay}, _From, State) ->
     end,
     {reply, Reply, State};
 
-handle_call({call, spi_transfer, Data, Len}, _From, State) ->
+handle_call({call, transfer, Data, Len}, _From, State) ->
     Res = port_lib:sync_call_to_port(State, {spi_transfer, Data, Len}),
     case Res of
 	-1 ->
@@ -184,3 +169,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @doc Initialize the SPI devname device.
+%% @end
+spi_init(Port, Devname) ->
+    case port_lib:sync_call_to_port(Port, {spi_init, Devname}) < 0 of
+	true ->
+	    {error, spi_initialization_error};
+	false ->
+	    ok
+    end.

@@ -15,9 +15,8 @@
 -define(SPIDELAY, 10).
 
 init() ->
-    spi_sup:start_link([?SPICHANNEL]),
-    spi:spi_init(?SPICHANNEL, "/dev/spidev0.0"),
-    spi:spi_config(?SPICHANNEL, ?SPIMODE, ?SPIBPW, ?SPISPEED, ?SPIDELAY).
+    spi_sup:start_link([{?SPICHANNEL, "/dev/spidev0.0"}]),
+    spi:config(?SPICHANNEL, ?SPIMODE, ?SPIBPW, ?SPISPEED, ?SPIDELAY).
 
 run_demo() ->
     init(),
@@ -25,7 +24,7 @@ run_demo() ->
     stop().
 
 mcp3002_read(Channel) ->
-    {_, Val1, Val2} = spi:spi_transfer(?SPICHANNEL, {1, (2 + Channel) bsl 6, 0}, 3),
+    {_, Val1, Val2} = spi:transfer(?SPICHANNEL, {1, (2 + Channel) bsl 6, 0}, 3),
     ((Val1 band 31) bsl 6) + (Val2 bsr 2).
 
 start() ->

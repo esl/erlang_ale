@@ -9,14 +9,14 @@
 
 %% API
 -export([start_link/1, stop/1]).
--export([i2c_init/2, i2c_write/4, i2c_read/3]).
+-export([write/4, read/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE). 
--define (I2CLIBRARY, "../priv/i2c_lib").
+-define(I2CLIBRARY, "../priv/i2c_lib").
 
 -type addr() :: integer().
 -type data() :: tuple().
@@ -35,29 +35,23 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link(Channel) ->
-    gen_server:start_link({local, Channel}, ?MODULE, [], []).
+start_link({Channel, Devname}) ->
+    gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
 stop(Channel) ->
     gen_server:cast(Channel, stop).
 
-%% @doc Initialize the i2c devname device.
-%% @end
--spec(i2c_init(channel(), devname()) -> ok | {error, error_type}).
-i2c_init(Channel, Devname) ->
-    gen_server:call(Channel, {call, i2c_init, Devname}).
-
 %% @doc write data into an i2c slave device.
 %% @end
--spec(i2c_write(channel(), addr(), data(), len()) -> ok | {error, error_type}).
-i2c_write(Channel, Addr, Data, Len) ->
-    gen_server:call(Channel, {call, i2c_write, Addr, Data, Len}).
+-spec(write(channel(), addr(), data(), len()) -> ok | {error, error_type}).
+write(Channel, Addr, Data, Len) ->
+    gen_server:call(Channel, {call, write, Addr, Data, Len}).
 
 %% @doc read data from an i2c slave device.
 %% @end
--spec(i2c_read(channel(), addr(), len()) -> {data()} | {error, error_type}).
-i2c_read(Channel, Addr, Len) ->
-    gen_server:call(Channel, {call, i2c_read, Addr, Len}).
+-spec(read(channel(), addr(), len()) -> {data()} | {error, error_type}).
+read(Channel, Addr, Len) ->
+    gen_server:call(Channel, {call, read, Addr, Len}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -74,9 +68,9 @@ i2c_read(Channel, Addr, Len) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
+init(Devname) ->
     Port = open_port({spawn, ?I2CLIBRARY}, [{packet, 2}, binary]),
-%    i2c_init(),
+    i2c_init(Port, Devname),
     {ok, Port}.
 
 %%--------------------------------------------------------------------
@@ -93,16 +87,7 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({call, i2c_init, Devname}, _From, State) ->
-    case port_lib:sync_call_to_port(State, {i2c_init, Devname}) < 0 of
-	true ->
-	    Reply = {error, i2c_initialization_error};
-	false ->
-	    Reply = ok
-    end,
-    {reply, Reply, State};
-
-handle_call({call, i2c_write, Addr, Data, Len}, _From, State) ->
+handle_call({call, write, Addr, Data, Len}, _From, State) ->
     case port_lib:sync_call_to_port(State, {i2c_write, Addr, Data, Len}) < 0 of
 	true ->
 	    Reply = {error, i2c_write_error};
@@ -111,7 +96,7 @@ handle_call({call, i2c_write, Addr, Data, Len}, _From, State) ->
     end,
     {reply, Reply, State};
 
-handle_call({call, i2c_read, Addr, Len}, _From, State) ->
+handle_call({call, read, Addr, Len}, _From, State) ->
     Res = port_lib:sync_call_to_port(State, {i2c_read, Addr, Len}),
     case Res of
 	-1 ->
@@ -181,3 +166,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @doc Initialize the i2c devname device.
+%% @end
+i2c_init(Port, Devname) ->
+    case port_lib:sync_call_to_port(Port, {i2c_init, Devname}) < 0 of
+	true ->
+	    {error, i2c_initialization_error};
+	false ->
+	    ok
+    end.
