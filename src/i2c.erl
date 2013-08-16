@@ -9,7 +9,7 @@
 
 %% API
 -export([start_link/1, stop/1]).
--export([write/4, read/3]).
+-export([write/3, read/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -28,13 +28,9 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
-%%--------------------------------------------------------------------
 -spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
     gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
@@ -44,9 +40,9 @@ stop(Channel) ->
 
 %% @doc write data into an i2c slave device.
 %% @end
--spec(write(channel(), addr(), data(), len()) -> ok | {error, reason}).
-write(Channel, Addr, Data, Len) ->
-    gen_server:call(Channel, {call, write, Addr, Data, Len}).
+-spec(write(channel(), addr(), data()) -> ok | {error, reason}).
+write(Channel, Addr, Data) ->
+    gen_server:call(Channel, {call, write, Addr, Data}).
 
 %% @doc read data from an i2c slave device.
 %% @end
@@ -88,7 +84,8 @@ init(Devname) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({call, write, Addr, Data, Len}, _From, State) ->
+handle_call({call, write, Addr, Data}, _From, State) ->
+    Len = tuple_size(Data),
     case port_lib:sync_call_to_port(State, {i2c_write, Addr, Data, Len}) < 0 of
 	true ->
 	    Reply = {error, i2c_write_error};
