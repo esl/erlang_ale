@@ -11,7 +11,7 @@ ebin/*
 *.o
 variables-*
 */temp/*
-
+.DS_Store
 dump_excludes
 dump_to_pi
 sync_excludes
