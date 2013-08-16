@@ -6,12 +6,12 @@ EI_LIB:=$(shell find /usr/local/lib/erlang /usr/lib/erlang -name ei.h -printf '%
 # Cross compilation bits for Mac, for development purposes only
 ifeq ($(UNAME), Darwin)
 XC_DIR=/usr/local/gcc-4.8.0-for-linux32
-CFLAGS=-Wall -I/usr/local/include -I$(EI_LIB) -I$(XC_DIR)/include -Ideps/erlang_portutil -Ideps/pihwm/lib
+CFLAGS=-Wall -std=c99 -I/usr/local/include -I$(EI_LIB) -I$(XC_DIR)/include -Ideps/erlang_portutil -Ideps/pihwm/lib
 CC=$(XC_DIR)/bin/i586-pc-linux-gcc
 endif
 
 ifeq ($(UNAME), Linux)
-CFLAGS=-Wall -I/usr/local/include -I$(EI_LIB) -Ideps/erlang_portutil -Ideps/pihwm/lib
+CFLAGS=-Wall -std=c99 -I/usr/local/include -I$(EI_LIB) -Ideps/erlang_portutil -Ideps/pihwm/lib
 CC=gcc
 endif
 
