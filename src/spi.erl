@@ -31,13 +31,9 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
-%%--------------------------------------------------------------------
 -spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
     gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
@@ -104,7 +100,7 @@ handle_call({call, transfer, Data, Len}, _From, State) ->
     Res = port_lib:sync_call_to_port(State, {spi_transfer, Data, Len}),
     case Res of
 	-1 ->
-	    Reply = {error, i2c_transfer_error};
+	    Reply = {error, spi_transfer_error};
 	Reply ->
 	    ok
     end,
