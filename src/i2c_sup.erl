@@ -23,13 +23,9 @@
 %%% API functions
 %%%===================================================================
 
-%%--------------------------------------------------------------------
 %% @doc
 %% Starts the supervisor
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
-%%--------------------------------------------------------------------
 -spec(start_link(chnlist()) -> {ok, pid()} | {error, reason}).
 start_link(Chnlist) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, Chnlist).
