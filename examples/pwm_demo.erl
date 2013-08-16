@@ -13,8 +13,9 @@
 
 %% Initialize the PWM peripheral
 init() ->
-       pwm:load_nif(),
-       pwm:init().
+%%       pwm:load_nif(),
+%%       pwm:init().
+    pwm:start_link().
 
 %% Run the demo
 start() ->
@@ -25,8 +26,9 @@ start() ->
 
 %% Release the PWM peripheral
 stop() ->
-	pwm:release(),
-	bye.
+%%	pwm:release(),
+    pwm:stop(),
+    bye.
 
 %% Change the value of the led from the min value to the max value
 fade_in(X) when X =< ?MAX_PWM ->
