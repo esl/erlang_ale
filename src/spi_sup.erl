@@ -1,6 +1,6 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This is the supervisor of i2c gen_server.
+%%% @doc This is the supervisor of SPI gen_server.
 %%% @end
 
 -module(spi_sup).
@@ -23,13 +23,9 @@
 %%% API functions
 %%%===================================================================
 
-%%--------------------------------------------------------------------
 %% @doc
 %% Starts the supervisor
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
-%%--------------------------------------------------------------------
 -spec(start_link(chnlist()) -> {ok, pid()} | {error, reason}).
 start_link(Chnlist) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, Chnlist).
