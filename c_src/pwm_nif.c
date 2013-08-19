@@ -42,7 +42,7 @@ static ERL_NIF_TERM release_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
 
 
 static ErlNifFunc nif_funcs[] = {
-     {"init", 0, init_nif},
+     {"pwm_init", 0, init_nif},
      {"pwm_value", 1, value_nif},
      {"pwm_release", 0, release_nif}
 };
