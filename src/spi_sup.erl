@@ -1,6 +1,6 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This is the supervisor of SPI gen_server.
+%%% @doc This is the supervisor of the SPI application.
 %%% @end
 
 -module(spi_sup).
@@ -24,12 +24,16 @@
 %%%===================================================================
 
 %% @doc
-%% Starts the supervisor
+%% Starts and initialize a list of process. Each one is identified by a
+%% channel name. Each channel drive a devname device.
 %% @end
 -spec(start_link(chnlist()) -> {ok, pid()} | {error, reason}).
 start_link(Chnlist) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, Chnlist).
 
+%% @doc
+%% Stop the SPI supervisor.
+%% @end
 stop() ->
     exit(whereis(?MODULE), shutdown).
 
@@ -63,7 +67,7 @@ init(Chnlist) ->
 %%% Internal functions
 %%%===================================================================
 
-%% SPI channels specification
+%% SPI process specification
 child_list([H | T]) ->
 %%    Restart = permanent,
     Restart = transient,

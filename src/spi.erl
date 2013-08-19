@@ -1,6 +1,8 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This module allow to use erlang/ALE to communicate through the SPI bus.
+%%% @doc This is the implementation of the SPI interface module.
+%%% There is one process for each spi device. Each process is linked to the supervisor
+%%% of the spi application.
 %%% @end
 
 -module(spi).
@@ -32,22 +34,28 @@
 %%%===================================================================
 
 %% @doc
-%% Starts the server
+%% Starts the process with the channel name and Initialize the devname device.
+%% You can identify the device by a channel name. Each cannel drive a devname device.
 %% @end
 -spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
     gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
+%% @doc
+%% Stop the process channel and release it.
+%% @end
 stop(Channel) ->
     gen_server:cast(Channel, stop).
 
-%% @doc SPI configuration.
+%% @doc
+%% Configure the SPI device.
 %% @end
 -spec(config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, reason}).
 config(Channel, Mode, Bits, Speed, Delay) ->
     gen_server:call(Channel, {call, config, Mode, Bits, Speed, Delay}).
 
-%% @doc SPI transfer.
+%% @doc
+%% Transfer data trough the SPI bus.
 %% @end
 -spec(transfer(channel(), data(), len()) -> {data()} | {error, reason}).
 transfer(Channel, Data, Len) ->

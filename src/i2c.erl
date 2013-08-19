@@ -1,6 +1,8 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This module allow to use erlang/ALE to send and receive data through i2c bus.
+%%% @doc This is the implementation of the I2C interface module.
+%%% There is one process for each i2c device. Each process is linked to the supervisor
+%%% of the i2c application.
 %%% @end
 
 -module(i2c).
@@ -29,22 +31,28 @@
 %%%===================================================================
 
 %% @doc
-%% Starts the server
+%% Starts the process with the channel name and Initialize the devname device.
+%% You can identify the device by a channel name. Each channel drive a devname device.
 %% @end
 -spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
     gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
+%% @doc
+%% Stop the process channel and release it.
+%% @end
 stop(Channel) ->
     gen_server:cast(Channel, stop).
 
-%% @doc write data into an i2c slave device.
+%% @doc 
+%% Write data into an i2c slave device.
 %% @end
 -spec(write(channel(), addr(), data()) -> ok | {error, reason}).
 write(Channel, Addr, Data) ->
     gen_server:call(Channel, {call, write, Addr, Data}).
 
-%% @doc read data from an i2c slave device.
+%% @doc 
+%% Read data from an i2c slave device.
 %% @end
 -spec(read(channel(), addr(), len()) -> {data()} | {error, reason}).
 read(Channel, Addr, Len) ->
