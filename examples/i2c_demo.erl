@@ -1,7 +1,7 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
 %%% @doc Sends and receives data to/from MCP23008 port expander through the I2C bus.
-%%%      It reads the state of DIP Switch pins and turn on some led.
+%%% It reads the state of DIP Switch pins and turn on some led.
 %%% @end
 
 -module(i2c_demo).
