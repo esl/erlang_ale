@@ -33,7 +33,6 @@ int main() {
   ETERM *fnp, *argp;
   int res;
   byte buf[100];
-  long allocated, freed;
 
   int fd;
 
@@ -98,4 +97,5 @@ int main() {
     erl_free_term(argp);
     erl_free_term(intp);
   }
+  return 0;
 }

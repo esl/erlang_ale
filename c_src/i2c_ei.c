@@ -19,7 +19,7 @@ void tuple_to_array(ETERM *tuple) {
 
   int tplsize = ERL_TUPLE_SIZE(tuple);
 
-  data=(char *) malloc (tplsize * sizeof (char));
+  data=(unsigned char *) malloc (tplsize * sizeof (char));
   int i=0;
   for (i=0; i<tplsize; i++) {
     data[i]=(char) ERL_INT_VALUE(erl_element(i+1, tuple));
@@ -32,7 +32,6 @@ int main() {
   ETERM *fnp, *argp;
   int res;
   byte buf[100];
-  long allocated, freed;
 
   int fd;
 
@@ -63,7 +62,7 @@ int main() {
     // calls the i2c_read function and return an erlang tuple with data or -1 if fails
     else if (strncmp(ERL_ATOM_PTR(fnp), "i2c_read", 8) == 0) {
       int size = ERL_INT_VALUE(erl_element(3, tuplep));
-      data=(char *) malloc (size * sizeof (char));
+      data=(unsigned char *) malloc (size * sizeof (char));
 
       res = i2c_read(fd, ERL_INT_VALUE(erl_element(2, tuplep)), data, size);
 
@@ -95,4 +94,5 @@ int main() {
     erl_free_term(argp);
     erl_free_term(intp);
   }
+  return 0;
 }
