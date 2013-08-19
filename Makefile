@@ -6,12 +6,12 @@ EI_LIB:=$(shell find /usr/local/lib/erlang /usr/lib/erlang -name ei.h -printf '%
 # Cross compilation bits for Mac, for development purposes only
 ifeq ($(UNAME), Darwin)
 XC_DIR=/usr/local/gcc-4.8.0-for-linux32
-CFLAGS=-Wall -std=c99 -I/usr/local/include -I$(EI_LIB) -I$(XC_DIR)/include -Ideps/erlang_portutil -Ideps/pihwm/lib
+CFLAGS=-Wall -I/usr/local/include -I$(EI_LIB) -I$(XC_DIR)/include -Ideps/erlang_portutil -Ideps/pihwm/lib
 CC=$(XC_DIR)/bin/i586-pc-linux-gcc
 endif
 
 ifeq ($(UNAME), Linux)
-CFLAGS=-Wall -std=c99 -I/usr/local/include -I$(EI_LIB) -Ideps/erlang_portutil -Ideps/pihwm/lib
+CFLAGS=-Wall -I/usr/local/include -I$(EI_LIB) -Ideps/erlang_portutil -Ideps/pihwm/lib
 CC=gcc
 endif
 
@@ -47,21 +47,18 @@ gpio_port: priv/gpio_port.o deps/erlang_portutil/portutil.o
 
 # PWM
 pwm_nif:
-	$(CC) $(LDFLAGS) $< -o priv/pwm_nif.so -fpic -shared c_src/pwm_nif.c deps/pihwm/lib/pihwm.c deps/pihwm/lib/pi_pwm.c
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o priv/pwm_nif.so -fpic -shared c_src/pwm_nif.c deps/pihwm/lib/pihwm.c deps/pihwm/lib/pi_pwm.c
 
 pwm: pwm_nif
-	erlc -o ./ebin src/pwm.erl
+	erlc -o ./ebin src/pwm.erl src/pwm_sup.erl
 
 # I2C
-erl_comm.o: c_src/erl_comm.c
-	$(CC) -c c_src/erl_comm.c -o priv/erl_comm.o
-
 i2c_ei.o: c_src/i2c_ei.c
-	$(CC) -c c_src/i2c_ei.c -o priv/i2c_ei.o
+	$(CC) $(CFLAGS) -c c_src/i2c_ei.c -o priv/i2c_ei.o
 
-i2c_lib: i2c_ei.o erl_comm.o
-	$(CC) -o priv/i2c_lib -I$(ERL_LIB)/include -lpthread -L$(ERL_LIB)/lib priv/i2c_ei.o priv/erl_comm.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_i2c.o -lerl_interface -lei 
-	rm -rf priv/i2c_ei.o priv/erl_comm.o
+i2c_lib: i2c_ei.o deps/erlang_portutil/portutil.o
+	$(CC) $(CFLAGS) -o priv/i2c_lib -I$(ERL_LIB)/include -lpthread -L$(ERL_LIB)/lib priv/i2c_ei.o deps/erlang_portutil/portutil.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_i2c.o -lerl_interface -lei 
+	rm -rf priv/i2c_ei.o
 
 port_lib.beam:
 	erlc -o ./ebin src/port_lib.erl
@@ -71,11 +68,11 @@ i2c: i2c_lib port_lib.beam
 
 # SPI
 spi_ei.o: c_src/spi_ei.c
-	$(CC) -c c_src/spi_ei.c -o priv/spi_ei.o
+	$(CC) $(CFLAGS) -c c_src/spi_ei.c -o priv/spi_ei.o
 
-spi_lib: spi_ei.o erl_comm.o
-	$(CC) -o priv/spi_lib -I$(ERL_LIB)/include -lpthread -L$(ERL_LIB)/lib priv/spi_ei.o priv/erl_comm.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_spi.o -lerl_interface -lei
-	rm -rf priv/spi_ei.o priv/erl_comm.o
+spi_lib: spi_ei.o deps/erlang_portutil/portutil.o
+	$(CC) $(CFLAGS) -o priv/spi_lib -I$(ERL_LIB)/include -lpthread -L$(ERL_LIB)/lib priv/spi_ei.o deps/erlang_portutil/portutil.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_spi.o -lerl_interface -lei
+	rm -rf priv/spi_ei.o
 
 spi: spi_lib port_lib.beam
 	erlc -o ./ebin src/spi.erl src/spi_sup.erl
