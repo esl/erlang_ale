@@ -103,3 +103,7 @@ priv/%.o: c_src/%.c
 
 .PHONY: all library init shell
 
+# DOCUMENTATION
+doc:
+	erl -noshell -run edoc files 'src/i2c.erl' 'src/i2c_sup.erl' 'src/spi.erl' 'src/spi_sup.erl' 'src/pwm.erl' 'src/pwm_sup.erl' -s init stop
+	mv edoc-info erlang.png *.html stylesheet.css edoc/
