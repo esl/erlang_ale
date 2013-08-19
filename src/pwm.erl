@@ -1,6 +1,8 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This module allow to use erlang/ALE to generate PWM signals.
+%%% @doc This is the implementation of the PWM interface module.
+%%% There is one process for each pwm device. Each process is liked to the supervisor
+%%% of the pwm application.
 %%% @end
 
 -module(pwm).
@@ -8,8 +10,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, stop/0, value/1]).
--export([load_nif/0, init/0, pwm_value/1, pwm_release/0]).
+-export([start_link/1, stop/1, value/2]).
+-export([load_nif/0, pwm_init/0, pwm_value/1, pwm_release/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -20,14 +22,28 @@
 -define(SERVER, ?MODULE).
 -define(NIF_PWM_LIB, "../priv/pwm_nif").
 
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+-type devname() :: string().
+-type channel() :: atom().
 
-stop() ->
-    gen_server:cast(?SERVER, stop).
+%% @doc
+%% Start the process with the channel name and Initialize the devname device.
+%% You can identify the device by a channel name. Each channel drive a devname device.
+%% @end
+-spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
+start_link({Channel, Devname}) ->
+    gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
 
-value(X) -> 
-    gen_server:call(?SERVER, {call, value, X}).
+%% @doc
+%% Stop the process channel and release it.
+%% @end
+stop(Channel) ->
+    gen_server:cast(Channel, stop).
+
+%% @doc
+%% Assign a PWM value at the channel.
+%% @end
+value(Channel, X) -> 
+    gen_server:call(Channel, {call, value, X}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -44,9 +60,9 @@ value(X) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
+init(Devname) ->
     load_nif(),
-    init(),
+    pwm_init(),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -126,14 +142,13 @@ code_change(_OldVsn, State, _Extra) ->
 %% @doc Load the PWM C library.
 %% @end
 -spec(load_nif() -> ok | {error, error_type}).
-
 load_nif() ->
     ok = erlang:load_nif(?NIF_PWM_LIB, 0).
 
 %% @doc Initialise the PWM peripheral.
 %% @end
--spec(init() -> ok | {error,pwm_initialization_error}).
-init() ->
+-spec(pwm_init() -> ok | {error,pwm_initialization_error}).
+pwm_init() ->
     exit({error, pwm_initialization_error}).
 
 %% @doc Set PWM value.
