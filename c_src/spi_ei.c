@@ -1,7 +1,11 @@
 /**
 * @file   spi_ei.c
 * @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
-* @brief  spi erlang interface
+* @brief  SPI erlang interface
+* @description
+*
+* @section LICENSE
+* Copyright (C) 2013 Erlang Solutions Ltd.
 **/
 
 #include <stdio.h>
@@ -10,12 +14,20 @@
 #include "erl_interface.h"
 #include "ei.h"
 
+/*! \addtogroup SPI
+*  @brief SPI library functions
+*  @{
+*/
+
 typedef unsigned char byte;
 
-// data buffer
+/** TX data buffer */
 uint8_t *txbuf;
 
-//convert an erlang tuple in an array
+/**
+* @brief Converts an erlang tuple in an C array and puts the data into the *data variable.
+* @param The erlang tuple.
+*/
 void tuple_to_array(ETERM *tuple) {
 
   int tplsize = ERL_TUPLE_SIZE(tuple);
@@ -27,10 +39,15 @@ void tuple_to_array(ETERM *tuple) {
   }
 }
 
+/**
+* @brief The main function.
+* It waits for data in the buffer and calls the driver.
+*/
+
 int main() {
 
   ETERM *tuplep, *intp;
-  ETERM *fnp, *argp;
+  ETERM *fnp;
   int res;
   byte buf[100];
 
@@ -41,12 +58,10 @@ int main() {
   while (read_cmd(buf) > 0) {
     tuplep = erl_decode(buf);
     fnp = erl_element(1, tuplep);
-    argp = erl_element(2, tuplep);
     
     // calls the spi_init_name function and returns the fd or -1
     if (strcmp(ERL_ATOM_PTR(fnp), "spi_init", 8) == 0) {
       res = spi_init_name(erl_iolist_to_string(erl_element(2, tuplep)));
-      //      res = spi_init(ERL_INT_VALUE(erl_element(2, tuplep)));
       fd = res;
       if (res < 0) {
 	intp = erl_mk_int(-1);
@@ -55,13 +70,13 @@ int main() {
 	intp = erl_mk_int(res);
       }
     }
-    // calls the spi_config function and return ok if success or -1 if fails
+    // calls the spi_config function and returns ok if success or -1 if fails
     else if (strcmp(ERL_ATOM_PTR(fnp), "spi_config", 10) == 0) {
       res = spi_config( fd, ERL_INT_VALUE(erl_element(2, tuplep)), ERL_INT_VALUE(erl_element(3, tuplep)), ERL_INT_VALUE(erl_element(4,tuplep)),
 			ERL_INT_VALUE(erl_element(5, tuplep)) );
       intp = erl_mk_int(res);
     }
-    // calls the spi_tranfer function and return an erlang tuple with data or -1 if fails
+    // calls the spi_tranfer function and returns an erlang tuple with data or -1 if fails
     else if (strncmp(ERL_ATOM_PTR(fnp), "spi_transfer", 12) == 0) {
       tuple_to_array(erl_element(2, tuplep));
       int size = ERL_INT_VALUE(erl_element(3, tuplep));
@@ -72,7 +87,7 @@ int main() {
       if (res < 0) {
 	intp=erl_mk_int(-1);
       }
-      // convert data array in an erlang tuple
+      // converts data array in an erlang tuple
       else {       
 	ETERM *etermarray[size];
 	int i=0;
@@ -94,7 +109,6 @@ int main() {
 
     erl_free_compound(tuplep);
     erl_free_term(fnp);
-    erl_free_term(argp);
     erl_free_term(intp);
   }
   return 0;
