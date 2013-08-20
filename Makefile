@@ -38,7 +38,7 @@ all: init library
 library: gpio_port pwm_nif i2c_lib spi_lib examples
 
 init:
-	mkdir -p priv ebin
+	mkdir -p priv ebin doc
 
 library: gpio_port pwm_nif
 
@@ -104,6 +104,10 @@ priv/%.o: c_src/%.c
 .PHONY: all library init shell
 
 # DOCUMENTATION
-doc:
+docs:
+	rm -rf doc/drivers doc/erl
+	mkdir -p doc/erl
 	erl -noshell -run edoc files 'src/i2c.erl' 'src/i2c_sup.erl' 'src/spi.erl' 'src/spi_sup.erl' 'src/pwm.erl' 'src/pwm_sup.erl' -s init stop
-	mv edoc-info erlang.png *.html stylesheet.css edoc/
+	mv edoc-info erlang.png *.html stylesheet.css doc/erl/
+	doxygen doc/doxygen.conf
+	mv doc/html doc/drivers
