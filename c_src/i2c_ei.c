@@ -20,12 +20,50 @@
 
 typedef unsigned char byte;
 
+/**
+* @brief	Initialises the devname I2C device
+*
+* @param	devname    The sysfs entry
+*
+* @return 	file descriptor if success, -1 if fails
+*/
+extern int i2c_init_name(char *devname);
+
+/**
+* @brief	I2C write operation
+*
+* @param	fd	File descriptor of the I2C device
+* @param	addr	I2C slave device address
+* @param	data	Data to write into the device
+* @param	len     Length of data
+*
+* @return 	1 for success, -1 for failure
+*/
+extern int i2c_write (unsigned int fd, unsigned int addr, unsigned char *data, unsigned int len);
+
+/**
+* @brief	I2C read operation
+*
+* @param	fd	File descriptor of the I2C device
+* @param	addr	I2C slave device address
+* @param	data	Pointer to the read buffer
+* @param	len	Length of data
+*
+* @return 	1 for success, -1 for failure
+*/
+extern int i2c_read (unsigned int fd, unsigned int addr, unsigned char *data, unsigned int len);
+
+extern int read_cmd(byte *buf);
+extern int write_cmd(byte *buf, int len);
+extern int strncmp(const char *s1, const char *s2, size_t n);
+
+
 /** TX/RX data buffer */
 unsigned char *data;
 
 /**
-* @brief Converts an erlang tuple in an C array and puts the data into the *data variable.
-* @param The erlang tuple.
+* @brief Converts an erlang tuple in an C array and puts the data into the *data variable
+* @param tuple    The erlang tuple
 */
 void tuple_to_array(ETERM *tuple) {
 
@@ -58,8 +96,8 @@ int main() {
     tuplep = erl_decode(buf);
     fnp = erl_element(1, tuplep);
     
-    // calls the i2c_init_name function and returns the fd or -1
-    if (strcmp(ERL_ATOM_PTR(fnp), "i2c_init", 8) == 0) {
+    // calls the i2c_init_name function and return the fd if sucess or -1 if fails
+    if (strncmp(ERL_ATOM_PTR(fnp), "i2c_init", 8) == 0) {
       res = i2c_init_name(erl_iolist_to_string(erl_element(2, tuplep)));
       fd=res;
       if (res < 0) {
@@ -70,7 +108,7 @@ int main() {
       }
     }
     // calls the i2c_write function and returns 1 if success or -1 if fails
-    else if (strcmp(ERL_ATOM_PTR(fnp), "i2c_write", 9) == 0) {
+    else if (strncmp(ERL_ATOM_PTR(fnp), "i2c_write", 9) == 0) {
       tuple_to_array(erl_element(3, tuplep));
       res = i2c_write(fd, ERL_INT_VALUE(erl_element(2, tuplep)), data, ERL_INT_VALUE(erl_element(4, tuplep)));
       intp = erl_mk_int(res);

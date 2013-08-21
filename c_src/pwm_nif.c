@@ -17,9 +17,35 @@
 *  @{
 */
 
+/**
+* @brief Initialises the PWM peripheral
+*
+* @return 1 if success, -1 if fails
+*
+* @todo Replace it with pwm_init_name(char *devname)
+*/
 extern int pwm_init();
+
+/**
+* @brief Sets PWM value
+*
+* @param value    PWM value
+*
+* @return 1 if success, -1 if fails
+*
+* @todo Replace it with pwm_value(int fd, unsigned int value)
+*/
 extern int pwm_value(unsigned int value);
+
+/**
+* @brief Releases the PWM device
+*
+* @return none
+*
+* @todo Replace it with pwm_release(int fd)
+*/
 extern int pwm_release();
+
 
 /**
 * @brief Calls the driver that initialize the PWM peripheral.
