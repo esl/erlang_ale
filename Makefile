@@ -38,7 +38,7 @@ all: init library
 library: gpio_port pwm_nif i2c_lib spi_lib examples
 
 init:
-	mkdir -p priv ebin doc
+	mkdir -p priv
 
 library: gpio_port pwm_nif
 
