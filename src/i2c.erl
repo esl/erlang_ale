@@ -18,7 +18,7 @@
 	 terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE). 
--define(I2CLIBRARY, "../priv/i2c_lib").
+-define(I2CLIBRARY, "priv/i2c_lib").
 
 -type addr() :: integer().
 -type data() :: tuple().

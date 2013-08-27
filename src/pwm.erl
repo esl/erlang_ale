@@ -20,7 +20,7 @@
 -onload([load_nif/0]).
 
 -define(SERVER, ?MODULE).
--define(NIF_PWM_LIB, "../priv/pwm_nif").
+-define(NIF_PWM_LIB, "priv/pwm_nif").
 
 -type devname() :: string().
 -type channel() :: atom().

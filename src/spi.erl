@@ -18,7 +18,7 @@
 	 terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE). 
--define (SPILIBRARY, "../priv/spi_lib").
+-define (SPILIBRARY, "priv/spi_lib").
 
 -type mode() :: integer().
 -type data() :: tuple().
