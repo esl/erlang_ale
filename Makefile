@@ -40,8 +40,6 @@ library: gpio_port pwm_nif i2c_lib spi_lib examples
 init:
 	mkdir -p priv
 
-library: gpio_port pwm_nif
-
 gpio_port: priv/gpio_port.o deps/erlang_portutil/portutil.o
 	$(CC) ${LDFLAGS} deps/erlang_portutil/portutil.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_gpio.o  priv/gpio_port.o -lerl_interface -lei -lpthread -o priv/gpio_port
 
