@@ -1,7 +1,7 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
 %%% @doc Changes the brightness of led from the min value to the max value and
-%%%      and come back.
+%%% and come back.
 %%% @end
 
 -module(pwm_demo).
@@ -13,8 +13,7 @@
 
 %% Initialize the PWM peripheral
 init() ->
-       pwm:load_nif(),
-       pwm:init().
+    pwm_sup:start_link([{pwm1, "/dev/pwm1"}]).
 
 %% Run the demo
 start() ->
@@ -25,12 +24,13 @@ start() ->
 
 %% Release the PWM peripheral
 stop() ->
-	pwm:release(),
-	bye.
+    pwm:stop(pwm1),
+    pwm_sup:stop(),
+    bye.
 
 %% Change the value of the led from the min value to the max value
 fade_in(X) when X =< ?MAX_PWM ->
-	 pwm:value(X),
+	 pwm:value(pwm1, X),
 	 timer:sleep(2),
 	 fade_in(X+1);
 fade_in(_X) ->
@@ -38,7 +38,7 @@ fade_in(_X) ->
 
 %% Change the value of the led from the max value to the min value
 fade_out(X) when X >= ?MIN_PWM ->
-	    pwm:value(X),
+	    pwm:value(pwm1, X),
 	    timer:sleep(2),
 	    fade_out(X-1);
 fade_out(_X) ->

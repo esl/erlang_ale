@@ -1,33 +1,41 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This is the implementation of the PWM interface module.
-%%% There is one process for each pwm device. Each process is liked to the supervisor
-%%% of the pwm application.
+%%% @doc This is the implementation of the SPI interface module.
+%%% There is one process for each spi device. Each process is linked to the supervisor
+%%% of the spi application.
 %%% @end
 
--module(pwm).
+-module(spi).
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/1, value/2]).
--export([load_nif/0, pwm_init/0, pwm_value/1, pwm_release/0]).
+-export([start_link/1, stop/1]).
+-export([config/5, transfer/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--onload([load_nif/0]).
+-define(SERVER, ?MODULE). 
+-define (SPILIBRARY, "priv/spi_lib").
 
--define(SERVER, ?MODULE).
--define(NIF_PWM_LIB, "priv/pwm_nif").
-
+-type mode() :: integer().
+-type data() :: tuple().
+-type bits() :: integer().
+-type delay() :: integer().
+-type speed() :: integer().
+-type len() :: integer().
 -type devname() :: string().
 -type channel() :: atom().
 
+%%%===================================================================
+%%% API
+%%%===================================================================
+
 %% @doc
-%% Start the process with the channel name and Initialize the devname device.
-%% You can identify the device by a channel name. Each channel drive a devname device.
+%% Starts the process with the channel name and Initialize the devname device.
+%% You can identify the device by a channel name. Each cannel drive a devname device.
 %% @end
 -spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
 start_link({Channel, Devname}) ->
@@ -40,10 +48,18 @@ stop(Channel) ->
     gen_server:cast(Channel, stop).
 
 %% @doc
-%% Assign a PWM value at the channel.
+%% Configure the SPI device.
 %% @end
-value(Channel, X) -> 
-    gen_server:call(Channel, {call, value, X}).
+-spec(config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, reason}).
+config(Channel, Mode, Bits, Speed, Delay) ->
+    gen_server:call(Channel, {call, config, Mode, Bits, Speed, Delay}).
+
+%% @doc
+%% Transfer data trough the SPI bus.
+%% @end
+-spec(transfer(channel(), data(), len()) -> {data()} | {error, reason}).
+transfer(Channel, Data, Len) ->
+    gen_server:call(Channel, {call, transfer, Data, Len}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -61,9 +77,9 @@ value(Channel, X) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Devname) ->
-    load_nif(),
-    pwm_init(),
-    {ok, []}.
+    Port = open_port({spawn, ?SPILIBRARY}, [{packet, 2}, binary]),
+    spi_init(Port, Devname),
+    {ok, Port}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -79,9 +95,25 @@ init(Devname) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({call, value, X}, _From, State) ->
-    Reply = pwm_value(X),
+handle_call({call, config, Mode, Bits, Speed, Delay}, _From, State) ->
+    case port_lib:sync_call_to_port(State, {spi_config, Mode, Bits, Speed, Delay}) < 0 of
+	true ->
+	    Reply = {error, spi_configuration_error};
+	false ->
+	    Reply = ok
+    end,
+    {reply, Reply, State};
+
+handle_call({call, transfer, Data, Len}, _From, State) ->
+    Res = port_lib:sync_call_to_port(State, {spi_transfer, Data, Len}),
+    case Res of
+	-1 ->
+	    Reply = {error, spi_transfer_error};
+	Reply ->
+	    ok
+    end,
     {reply, Reply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -93,8 +125,8 @@ handle_call({call, value, X}, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+
 handle_cast(stop, State) ->
-    pwm_release(),
     {stop, normal, State}.
 
 %%--------------------------------------------------------------------
@@ -139,27 +171,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-%% @doc Load the PWM C library.
+%% @doc Initialize the SPI devname device.
 %% @end
--spec(load_nif() -> ok | {error, error_type}).
-load_nif() ->
-    ok = erlang:load_nif(?NIF_PWM_LIB, 0).
-
-%% @doc Initialise the PWM peripheral.
-%% @end
--spec(pwm_init() -> ok | {error,pwm_initialization_error}).
-pwm_init() ->
-    exit({error, pwm_initialization_error}).
-
-%% @doc Set PWM value.
-%% @end
--type val() :: 0..1024.
--spec(pwm_value(val()) -> ok).
-pwm_value(_Val) ->
-    {error, pwm_value_error}.
-
-%% @doc Releases the PWM peripheral and unmaps the memory.
-%% @end
--spec(pwm_release() -> ok).
-pwm_release() ->
-    exit({error, pwm_release_error}).
+spi_init(Port, Devname) ->
+    case port_lib:sync_call_to_port(Port, {spi_init, Devname}) < 0 of
+	true ->
+	    exit({error, spi_initialization_error});
+	false ->
+	    ok
+    end.

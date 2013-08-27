@@ -13,17 +13,18 @@ open_port(SharedLib) ->
 
 send_to_port(Owner, Port, Msg) ->
     %%    Bin = term_to_binary(Msg),
-    io:format("send_to_port: ~p~n", [Msg]),
+%%--    io:format("send_to_port: ~p~n", [Msg]),
       Port ! {Owner, {command, term_to_binary(Msg)}}.
 %%    io:format("send_to_port: Bin=~p~n", [Bin]),
 %%    erlang:port_command(Port, Bin).
     
 sync_call_to_port(Port, Msg) ->
+
     send_to_port(self(), Port, Msg),
     receive
         {Port, {data, BinResult}} ->
             Result = binary_to_term(BinResult),
-            io:format("sync_call_to_port result: ~p~n", [Result]),
+%%--            io:format("sync_call_to_port result: ~p~n", [Result]),
             Result
     end.
 
