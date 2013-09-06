@@ -87,7 +87,6 @@ extern int gpio_set_int(unsigned int pin, void(*isr)(int), char *mode);
 
 /**
 * @brief Port interface for gpio_init
-* It waits for data in the buffer and calls the driver.
 */
 int
 port_gpio_init (ETERM *pin_t, ETERM *direction_t)
@@ -116,7 +115,6 @@ port_gpio_init (ETERM *pin_t, ETERM *direction_t)
 
 /**
 * @brief Port interface for gpio_init
-* It waits for data in the buffer and calls the driver.
 */
 int
 port_gpio_release (int pin)
@@ -126,7 +124,6 @@ port_gpio_release (int pin)
 
 /**
 * @brief Port interface for gpio_init
-* It waits for data in the buffer and calls the driver.
 */
 int
 port_gpio_write (int pin, ETERM *valuet)
@@ -138,7 +135,6 @@ port_gpio_write (int pin, ETERM *valuet)
 
 /**
 * @brief Port interface for gpio_init
-* It waits for data in the buffer and calls the driver.
 */
 int
 port_gpio_read (int pin)
@@ -164,7 +160,6 @@ gpio_isr(int pin)
 
 /**
 * @brief Port interface for gpio_init
-* It waits for data in the buffer and calls the driver.
 */
 int
 port_gpio_set_int (int pin, ETERM* condition_t)
