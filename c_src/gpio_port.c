@@ -1,3 +1,13 @@
+/**
+* @file   gpio_port.c
+* @author Erlang Solutions Ltd
+* @brief  GPIO erlang interface
+* @description
+*
+* @section LICENSE
+* Copyright (C) 2013 Erlang Solutions Ltd.
+**/
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -12,6 +22,11 @@
 
 #define BUF_SIZE 1024
 
+/*! \addtogroup GPIO
+*  @brief GPIO library functions
+*  @{
+*/
+
 // to store file descriptors
 //int gpio_fd[64] = { -1 };
 
@@ -19,6 +34,61 @@ static int my_pin;
 static ETERM *my_condition;
 
 // GPIO functions
+
+/**
+* @brief	Initialises the devname GPIO device
+*
+* @param	pin_t            The GPIO pin
+* @param        direction_t      Direction of pin (input or output)
+*
+* @return 	1 for success, -1 for failure
+*/
+extern int gpio_init(unsigned int pin, unsigned int dir);
+
+/**
+* @brief	Release a GPIO pin
+*
+* @param	pin            The GPIO pin
+*
+* @return 	1 for success, -1 for failure
+*/
+extern int gpio_release(unsigned int pin);
+
+/**
+* @brief	Set pin with the value "0" or "1"
+*
+* @param	pin            The GPIO pin
+* @param        valuet         Value to set (0 or 1)
+*
+* @return 	1 for success, -1 for failure
+*/
+extern int gpio_write(unsigned int pin, unsigned int val);
+
+/**
+* @brief	Read the value of the pin
+*
+* @param	pin            The GPIO pin
+*
+* @return 	The pin value if success, -1 for failure
+*/
+extern int gpio_read(unsigned int pin);
+
+/**
+* @brief	Set isr as the interrupt service routine (ISR) for the pin. Mode should be one of the strings "rising", "falling" or "both" to indicate which edge(s) the ISR is to be triggered on. The function isr is called whenever the edge specified occurs, receiving as argument the number of the pin which triggered the interrupt. 
+*
+* @param	pin	Pin number to attach interrupt to
+* @param        isr	Interrupt service routine to call
+* @param        mode	Interrupt mode
+*
+* @return 	Returns 1 on success. Never fails 
+*/
+extern int gpio_set_int(unsigned int pin, void(*isr)(int), char *mode);
+
+
+/**
+* @brief Port interface for gpio_init
+* It waits for data in the buffer and calls the driver.
+*/
 int
 port_gpio_init (ETERM *pin_t, ETERM *direction_t)
 {
@@ -44,12 +114,20 @@ port_gpio_init (ETERM *pin_t, ETERM *direction_t)
    return gpio_init(pin, dir);
 }
 
+/**
+* @brief Port interface for gpio_init
+* It waits for data in the buffer and calls the driver.
+*/
 int
 port_gpio_release (int pin)
 {
-	return gpio_release(pin);
+   return gpio_release(pin);
 }
 
+/**
+* @brief Port interface for gpio_init
+* It waits for data in the buffer and calls the driver.
+*/
 int
 port_gpio_write (int pin, ETERM *valuet)
 {
@@ -58,12 +136,15 @@ port_gpio_write (int pin, ETERM *valuet)
    return gpio_write(pin, value);
 }
 
+/**
+* @brief Port interface for gpio_init
+* It waits for data in the buffer and calls the driver.
+*/
 int
 port_gpio_read (int pin)
 {
    return gpio_read(pin);
 }
-
 
 void
 gpio_isr(int pin)
@@ -81,6 +162,10 @@ gpio_isr(int pin)
       
 }
 
+/**
+* @brief Port interface for gpio_init
+* It waits for data in the buffer and calls the driver.
+*/
 int
 port_gpio_set_int (int pin, ETERM* condition_t)
 {
@@ -94,7 +179,10 @@ port_gpio_set_int (int pin, ETERM* condition_t)
 
 
 
-/* MAIN */
+/**
+* @brief The main function.
+* It waits for data in the buffer and calls the driver.
+*/
 int main() {
   unsigned char buf[BUF_SIZE];
   /* char command[MAXATOMLEN]; */
