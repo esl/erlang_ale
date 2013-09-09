@@ -2,7 +2,7 @@
 %% ex: ts=4 sw=4 ft=erlang et
 
 {application,erlhw,
-             [{description,"erlhw - access to hardware"},
+             [{description,"Erlang/ALE - Erlang Actor Library for Embedded"},
               {vsn,"0.0.1"},
               {modules,[gpio, port_lib]},
               {registered,[]},
