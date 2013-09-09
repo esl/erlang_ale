@@ -39,7 +39,7 @@ all: init library
 library: gpio pwm i2c spi examples
 
 init:
-	mkdir -p priv
+	mkdir -p priv ebin
 
 gpio_port: priv/gpio_port.o deps/erlang_portutil/portutil.o
 	$(CC) ${LDFLAGS} deps/erlang_portutil/portutil.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_gpio.o  priv/gpio_port.o -lerl_interface -lei -lpthread -o priv/gpio_port
