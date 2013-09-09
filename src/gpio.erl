@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2,
+-export([start_link/1,
          release/1,
          write/2,
          read/1,
@@ -56,9 +56,9 @@
 %% process spawned.
 %% @todo Add init for exclusive pins
 %% @end
--spec start_link(pin(), pin_direction()) ->
+-spec start_link({pin(), pin_direction()}) ->
                     {'ok', pid()} | 'ignore' | {'error', term()}.
-start_link(Pin, Direction) ->
+start_link({Pin, Direction}) ->
   case gproc:lookup_local_name(pname(Pin)) of
     undefined ->
       gen_server:start_link(?MODULE, [Pin, Direction], []);
@@ -240,14 +240,13 @@ pname(Pin) ->
   {gpio_pin, Pin}.
 
 
-%% @doc value_change(Old, New)
+%% value_change(Old, New)
 %% value_change(0, 1) ->
 %%   raising;
 %% value_change(1, 0) ->
 %%   falling;
 %% value_change(_, _) ->
 %%   no_change.
-
 
 %%% Local Variables:
 %%% erlang-indent-level: 2
