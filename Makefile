@@ -35,7 +35,8 @@ LDFLAGS=-L. -L$(ERL_LIB)/lib -Ldeps/pihwm/lib -Lpriv
 
 all: init library
 
-library: gpio_port pwm_nif i2c_lib spi_lib examples
+#library: gpio_port pwm_nif i2c_lib spi_lib examples
+library: gpio pwm i2c spi examples
 
 init:
 	mkdir -p priv
@@ -102,7 +103,7 @@ clean_ct:
 priv/%.o: c_src/%.c
 	$(CC) -g $(CFLAGS) -c -o $@ $<
 
-.PHONY: all library init shell
+.PHONY: examples all library init shell
 
 # DOCUMENTATION
 docs:
