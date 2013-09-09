@@ -1,0 +1,3 @@
+%% encoding: UTF-8
+{packages,[]}.
+{modules,[gpio,gpio_sup,i2c,i2c_sup,pwm,pwm_sup,spi,spi_sup]}.
