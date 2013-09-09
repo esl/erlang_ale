@@ -106,10 +106,10 @@ priv/%.o: c_src/%.c
 
 # DOCUMENTATION
 docs:
-	rm -rf doc/drivers doc/erl
-	mkdir -p doc/erl
+	rm -rf doc/interface doc/erlang-api
+	mkdir -p doc/erlang-api
 	erl -noshell -run edoc files 'src/i2c.erl' 'src/i2c_sup.erl' 'src/spi.erl' 'src/spi_sup.erl' 'src/pwm.erl' 'src/pwm_sup.erl' 'src/gpio.erl' 'src/gpio_sup.erl' -s init stop
-	mv edoc-info erlang.png *.html stylesheet.css doc/erl/
+	mv edoc-info erlang.png *.html stylesheet.css doc/erlang-api/
 	doxygen doc/doxygen.conf
 
-	mv doc/html doc/drivers
+	mv doc/html doc/interface
