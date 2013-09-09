@@ -111,12 +111,12 @@ clean-deps:
 
 # Documentation.
 
-docs: clean-docs
-	$(gen_verbose) erl -noshell \
-		-eval 'edoc:application($(PROJECT), ".", []), init:stop().'
+#docs: clean-docs
+#	$(gen_verbose) erl -noshell \
+#		-eval 'edoc:application($(PROJECT), ".", []), init:stop().'
 
-clean-docs:
-	$(gen_verbose) rm -f doc/*.css doc/*.html doc/*.png doc/edoc-info
+#clean-docs:
+#	$(gen_verbose) rm -f doc/*.css doc/*.html doc/*.png doc/edoc-info
 
 # Tests.
 

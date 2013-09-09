@@ -43,6 +43,9 @@ init:
 gpio_port: priv/gpio_port.o deps/erlang_portutil/portutil.o
 	$(CC) ${LDFLAGS} deps/erlang_portutil/portutil.o deps/pihwm/lib/pihwm.o deps/pihwm/lib/pi_gpio.o  priv/gpio_port.o -lerl_interface -lei -lpthread -o priv/gpio_port
 
+gpio: gpio_port port_lib.beam
+	erlc -o ./ebin src/gpio.erl src/gpio_sup.erl
+
 # PWM
 pwm_nif:
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -o priv/pwm_nif.so -fpic -shared c_src/pwm_nif.c deps/pihwm/lib/pihwm.c deps/pihwm/lib/pi_pwm.c
@@ -103,9 +106,10 @@ priv/%.o: c_src/%.c
 
 # DOCUMENTATION
 docs:
-	rm -rf doc/drivers doc/erl
-	mkdir -p doc/erl
-	erl -noshell -run edoc files 'src/i2c.erl' 'src/i2c_sup.erl' 'src/spi.erl' 'src/spi_sup.erl' 'src/pwm.erl' 'src/pwm_sup.erl' -s init stop
-	mv edoc-info erlang.png *.html stylesheet.css doc/erl/
+	rm -rf doc/interface doc/erlang-api
+	mkdir -p doc/erlang-api
+	erl -noshell -run edoc files 'src/i2c.erl' 'src/i2c_sup.erl' 'src/spi.erl' 'src/spi_sup.erl' 'src/pwm.erl' 'src/pwm_sup.erl' 'src/gpio.erl' 'src/gpio_sup.erl' -s init stop
+	mv edoc-info erlang.png *.html stylesheet.css doc/erlang-api/
 	doxygen doc/doxygen.conf
-	mv doc/html doc/drivers
+
+	mv doc/html doc/interface
