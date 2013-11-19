@@ -41,12 +41,12 @@ start_link() ->
 %%%===================================================================
 
 init([]) ->
-    {ok, _} = gpio:start_link(?UP_PIN, input),
-    {ok, _} = gpio:start_link(?DOWN_PIN, input),
+    {ok, _} = gpio:start_link({?UP_PIN, input}),
+    {ok, _} = gpio:start_link({?DOWN_PIN, input}),
     ok = gpio:set_int(?UP_PIN, rising),
     ok = gpio:set_int(?DOWN_PIN, rising),
-    {ok, _} = gpio:start_link(?ONES_PIN, output),
-    {ok, _} = gpio:start_link(?TWOS_PIN, output),
+    {ok, _} = gpio:start_link({?ONES_PIN, output}),
+    {ok, _} = gpio:start_link({?TWOS_PIN, output}),
     {ok, #state{}}.
 
 handle_call(_Request, _From, State) ->
