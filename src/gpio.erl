@@ -88,7 +88,7 @@ read(Pin) ->
 
 %% @doc set_int/2 sets an interrupt on a pin with a given condition.
 %% The requesting process will be sent a message with the structure
-%% {gpio_interrupt, Condition} when the interrupt triggers.
+%% <code>{gpio_interrupt, Pin, Condition}</code> when the interrupt triggers.
 %% More than one process can listen on an interrupt condition, but
 %% only one interrupt condition can be set at a time.
 %% @todo Specify the errors more precisely.
