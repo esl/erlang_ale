@@ -1,5 +1,3 @@
-include erlang.mk
-
 PROJECT=erlang_ale
 EILOC:=$(shell find /usr/local/lib/erlang /usr/lib/erlang -name ei.h -printf '%h\n' 2> /dev/null | head -1)
 LDFLAGS=-Lpriv -L/usr/lib/erlang/usr/lib
@@ -25,6 +23,8 @@ ifeq ($(UNAME), Linux)
   CFLAGS=-I/usr/local/include -I$(EILOC) -I/usr/lib/erlang/usr/include/ -Ideps/erlang_portutil -Ideps/pihwm/lib
   CC=gcc
 endif
+
+include erlang.mk
 
 ###################################
 
@@ -97,6 +97,7 @@ spi_lib: pihwm portutil
 	$(CC) $(LDFLAGS) $(CFLAGS) -o priv/spi_lib \
 		priv/portutil.o priv/pihwm.o priv/pi_spi.o c_src/spi_ei.c \
 		-lpthread -lerl_interface -lei
+
 ###################################
 
 # Tests
