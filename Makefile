@@ -1,6 +1,6 @@
 PROJECT=erlang_ale
 EILOC:=$(shell find /usr/local/lib/erlang /usr/lib/erlang -name ei.h -printf '%h\n' 2> /dev/null | head -1)
-LDFLAGS=-Lpriv -L/usr/lib/erlang/usr/lib
+LDFLAGS=-Lpriv -L/usr/lib/erlang/usr/lib -L$(shell find /usr/local/lib/erlang /usr/lib/erlang -name libei.a -printf '%h\n' 2> /dev/null | head -1)
 UNAME := $(shell uname)
 
 # Dependencies
