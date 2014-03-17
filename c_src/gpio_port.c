@@ -253,7 +253,7 @@ int main() {
                     if (port_gpio_release(my_pin))
                     {
           //             syslog(LOG_NOTICE, "gpio_relase went well for pin %d",
-                              my_pin);
+          //                    my_pin);
                     }
                     else
                     {
