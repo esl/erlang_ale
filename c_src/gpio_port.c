@@ -240,6 +240,7 @@ int main() {
               }
               if (write_cmd_eterm(resp))
         //         syslog(LOG_NOTICE, "write_cmd_eterm done for init ");
+        ;
               else
                  syslog(LOG_NOTICE, "write_cmd_eterm FAILED for init");
            }
