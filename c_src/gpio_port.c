@@ -149,7 +149,7 @@ gpio_isr(int pin)
 
    if (write_cmd_eterm(resp))
    {
-      syslog(LOG_NOTICE, "gpio_interrupt for pin %d", pin);
+     // syslog(LOG_NOTICE, "gpio_interrupt for pin %d", pin);
    }
    else
    {
@@ -197,14 +197,14 @@ int main() {
  */ 
   openlog("gpio_port", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 
-  syslog(LOG_NOTICE, "openlog done");
+  //syslog(LOG_NOTICE, "openlog done");
   
   while ((res = read_cmd(buf)) > 0)
   {
      syslog(LOG_NOTICE, "read_cmd done");
      if ((emsg = erl_decode(buf)) != NULL)
      {
-        syslog(LOG_NOTICE, "erl_decode done");
+    //    syslog(LOG_NOTICE, "erl_decode done");
      }
      else
      {
@@ -215,7 +215,7 @@ int main() {
      
      if ((msg_type = erl_element(1, emsg)) != NULL)
      {
-        syslog(LOG_NOTICE, "erl_element succeeded!");
+      //  syslog(LOG_NOTICE, "erl_element succeeded!");
         syslog(LOG_NOTICE, "msg_type: %s", ERL_ATOM_PTR(msg_type));
 
         if (strncmp(ERL_ATOM_PTR(msg_type), "init", 4) == 0)
@@ -239,7 +239,8 @@ int main() {
                  resp = erl_format("{error, gpio_init_wrong_arguments}");
               }
               if (write_cmd_eterm(resp))
-                 syslog(LOG_NOTICE, "write_cmd_eterm done for init ");
+        //         syslog(LOG_NOTICE, "write_cmd_eterm done for init ");
+        ;
               else
                  syslog(LOG_NOTICE, "write_cmd_eterm FAILED for init");
            }
@@ -251,8 +252,8 @@ int main() {
                  {
                     if (port_gpio_release(my_pin))
                     {
-                       syslog(LOG_NOTICE, "gpio_relase went well for pin %d",
-                              my_pin);
+          //             syslog(LOG_NOTICE, "gpio_relase went well for pin %d",
+          //                    my_pin);
                     }
                     else
                     {
@@ -336,7 +337,7 @@ int main() {
               /* Now we can send the response to the caller */
               if (write_cmd_eterm(erl_format("{port_reply,~w,~w}", refp, resp)))
               {
-                 syslog(LOG_NOTICE, "successful reply to call");
+            //     syslog(LOG_NOTICE, "successful reply to call");
               }
               else
               {
