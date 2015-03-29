@@ -1,68 +1,170 @@
-/**
-* @file   gpio_port.c
-* @author Erlang Solutions Ltd
-* @brief  GPIO erlang interface
-* @description
-*
-* @section LICENSE
-* Copyright (C) 2013 Erlang Solutions Ltd.
-**/
+/*
+ * Copyright (C) 2015 Frank Hunleth
+ * Copyright (C) 2013 Erlang Solutions Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
+#include <err.h>
+#include <poll.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#include <erl_interface.h>
-#include <ei.h>
-#include <portutil.h>
-#include <pihwm.h>
-#include <pi_gpio.h>
+#include "erlcmd.h"
 
-#define BUF_SIZE 1024
+//#define DEBUG
+#ifdef DEBUG
+#define debug(...) do { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\r\n"); } while(0)
+#else
+#define debug(...)
+#endif
 
-/*! \addtogroup GPIO
-*  @brief GPIO library functions
-*  @{
-*/
+/*
+ * GPIO handling definitions and prototypes
+ */
+enum gpio_state {
+    GPIO_OUTPUT,
+    GPIO_INPUT
+};
 
-// to store file descriptors
-//int gpio_fd[64] = { -1 };
+enum interrupt_mode {
+    GPIO_INT_NONE,
+    GPIO_INT_BOTH,
+    GPIO_INT_RISING,
+    GPIO_INT_FALLING,
+    GPIO_INT_SUMMARIZE
+};
 
-static int my_pin;
-static ETERM *my_condition;
+struct gpio {
+    enum gpio_state state;
+    int fd;
+    int pin_number;
+    enum interrupt_mode int_mode;
+    int last_value;
+};
+
+/**
+ * @brief write a string to a sysfs file
+ * @return returns 0 on failure, >0 on success
+ */
+int sysfs_write_file(const char *pathname, const char *value)
+{
+    int fd = open(pathname, O_WRONLY);
+    if (fd < 0) {
+        debug("Error opening %s", pathname);
+        return 0;
+    }
+
+    size_t count = strlen(value);
+    ssize_t written = write(fd, value, count);
+    close(fd);
+
+    if (written < 0 || (size_t) written != count) {
+        warn("Error writing '%s' to %s", value, pathname);
+        return 0;
+    }
+
+    return written;
+}
 
 // GPIO functions
 
 /**
-* @brief	Initialises the devname GPIO device
-*
-* @param	pin_t            The GPIO pin
-* @param        direction_t      Direction of pin (input or output)
-*
-* @return 	1 for success, -1 for failure
-*/
-extern int gpio_init(unsigned int pin, unsigned int dir);
+ * @brief	Open and configure a GPIO
+ *
+ * @param	pin           The pin structure
+ * @param	pin_number    The GPIO pin
+ * @param   dir           Direction of pin (input or output)
+ *
+ * @return 	1 for success, -1 for failure
+ */
+int gpio_init(struct gpio *pin, unsigned int pin_number, enum gpio_state dir)
+{
+    /* Initialize the pin structure. */
+    pin->state = dir;
+    pin->fd = -1;
+    pin->pin_number = pin_number;
+    pin->int_mode = GPIO_INT_NONE;
+    pin->last_value = -1;
+
+    /* Construct the gpio control file paths */
+    char direction_path[64];
+    sprintf(direction_path, "/sys/class/gpio/gpio%d/direction", pin_number);
+
+    char value_path[64];
+    sprintf(value_path, "/sys/class/gpio/gpio%d/value", pin_number);
+
+    /* Check if the gpio has been exported already. */
+    if (access(value_path, F_OK) == -1) {
+        /* Nope. Export it. */
+        char pinstr[64];
+        sprintf(pinstr, "%d", pin_number);
+        if (!sysfs_write_file("/sys/class/gpio/export", pinstr))
+            return -1;
+    }
+
+    /* The direction file may not exist if the pin only works one way.
+       It is ok if the direction file doesn't exist, but if it does
+       exist, we must be able to write it.
+    */
+    if (access(direction_path, F_OK) != -1) {
+	const char *dir_string = (dir == GPIO_OUTPUT ? "out" : "in");
+        if (!sysfs_write_file(direction_path, dir_string)) {
+            /* This has failed on a Raspberry Pi in what looks is due
+               to a race condition with exporting the GPIO. Sleep
+               momentarily as a workaround. */
+            sleep(1);
+
+            if (!sysfs_write_file(direction_path, dir_string))
+                return -1;
+        }
+    }
+
+    pin->pin_number = pin_number;
+
+    /* Open the value file for quick access later */
+    pin->fd = open(value_path, pin->state == GPIO_OUTPUT ? O_RDWR : O_RDONLY);
+    if (pin->fd < 0)
+        return -1;
+
+    return 1;
+}
 
 /**
-* @brief	Release a GPIO pin
-*
-* @param	pin            The GPIO pin
-*
-* @return 	1 for success, -1 for failure
-*/
-extern int gpio_release(unsigned int pin);
+ * @brief	Set pin with the value "0" or "1"
+ *
+ * @param	pin           The pin structure
+ * @param       value         Value to set (0 or 1)
+ *
+ * @return 	1 for success, -1 for failure
+ */
+int gpio_write(struct gpio *pin, unsigned int val)
+{
+    if (pin->state != GPIO_OUTPUT)
+        return -1;
 
-/**
-* @brief	Set pin with the value "0" or "1"
-*
-* @param	pin            The GPIO pin
-* @param        valuet         Value to set (0 or 1)
-*
-* @return 	1 for success, -1 for failure
-*/
-extern int gpio_write(unsigned int pin, unsigned int val);
+    char buf = val ? '1' : '0';
+    ssize_t amount_written = pwrite(pin->fd, &buf, sizeof(buf), 0);
+    if (amount_written < (ssize_t) sizeof(buf))
+        err(EXIT_FAILURE, "pwrite");
+
+    return 1;
+}
 
 /**
 * @brief	Read the value of the pin
@@ -71,412 +173,279 @@ extern int gpio_write(unsigned int pin, unsigned int val);
 *
 * @return 	The pin value if success, -1 for failure
 */
-extern int gpio_read(unsigned int pin);
-
-/**
-* @brief	Set isr as the interrupt service routine (ISR) for the pin. Mode should be one of the strings "rising", "falling" or "both" to indicate which edge(s) the ISR is to be triggered on. The function isr is called whenever the edge specified occurs, receiving as argument the number of the pin which triggered the interrupt. 
-*
-* @param	pin	Pin number to attach interrupt to
-* @param        isr	Interrupt service routine to call
-* @param        mode	Interrupt mode
-*
-* @return 	Returns 1 on success. Never fails 
-*/
-extern int gpio_set_int(unsigned int pin, void(*isr)(int), char *mode);
-
-
-/**
-* @brief Port interface for gpio_init
-*/
-int
-port_gpio_init (ETERM *pin_t, ETERM *direction_t)
+int gpio_read(struct gpio *pin)
 {
-   int pin, dir;
-   /* convert erlang terms to usable values */
-   pin = ERL_INT_VALUE(pin_t);
-   syslog(LOG_NOTICE, "init with direction %s", ERL_ATOM_PTR(direction_t));
-   
-   if (strncmp(ERL_ATOM_PTR(direction_t), "input", 5) == 0)
-   {
-      dir = 1;
-   } else if (strncmp(ERL_ATOM_PTR(direction_t), "output", 6) == 0)
-   {
-      dir = 0;
-   } else
-   {
-      return -1;
-   }
+    char buf;
+    ssize_t amount_read = pread(pin->fd, &buf, sizeof(buf), 0);
+    if (amount_read < (ssize_t) sizeof(buf))
+        err(EXIT_FAILURE, "pread");
 
-   syslog(LOG_NOTICE, "init with dir %d", dir);
-   my_pin = pin;
-      
-   return gpio_init(pin, dir);
+    return buf == '1' ? 1 : 0;
 }
 
 /**
-* @brief Port interface for gpio_release
-*/
-int
-port_gpio_release (int pin)
+ * Set isr as the interrupt service routine (ISR) for the pin.
+ *
+ * Supported modes:
+ *
+ *   "none"  -> disable interrupt notifications
+ *   "rising" -> notify rising transitions only
+ *   "falling" -> notify falling transitions only
+ *   "both" -> notify both rising and falling transitions
+ *   "enabled" -> alias for "both"
+ *   "summarize" -> if the GPIO transitions multiple times
+ *                  between notifications, avoid reporting
+ *                  transients. This is a weak form of
+ *                  debouncing.
+ *
+ * @param   pin	    Pin number to attach interrupt to
+ * @param   modes   Interrupt mode
+ *
+ * @return  Returns 1 on success.
+ */
+int gpio_set_int(struct gpio *pin, const char *mode)
 {
-   return gpio_release(pin);
-}
+    if (strcmp(mode, "none") == 0)
+        pin->int_mode = GPIO_INT_NONE;
+    else if (strcmp(mode, "rising") == 0)
+        pin->int_mode = GPIO_INT_RISING;
+    else if (strcmp(mode, "falling") == 0)
+        pin->int_mode = GPIO_INT_FALLING;
+    else if (strcmp(mode, "both") == 0)
+        pin->int_mode = GPIO_INT_BOTH;
+    else if (strcmp(mode, "enabled") == 0)
+        pin->int_mode = GPIO_INT_BOTH;
+    else if (strcmp(mode, "summarize") == 0)
+        pin->int_mode = GPIO_INT_SUMMARIZE;
+    else
+        errx(EXIT_FAILURE, "Unknown interrupt mode: %s", mode);
 
-/**
-* @brief Port interface for gpio_write
-*/
-int
-port_gpio_write (int pin, ETERM *valuet)
-{
-   int value;
-   value = ERL_INT_VALUE(valuet);
-   return gpio_write(pin, value);
-}
+    if (pin->state != GPIO_INPUT)
+        return 0;
 
-/**
-* @brief Port interface for gpio_read
-*/
-int
-port_gpio_read (int pin)
-{
-   return gpio_read(pin);
-}
+    /* Never summarize the first interrupt so that the
+     * app can get the initial state. Linux sends a notification
+     * on registration.
+     */
+    pin->last_value = -1;
 
-void
-gpio_isr(int pin)
-{
-   ETERM *resp = erl_format("{gpio_interrupt, ~w}", my_condition);
-
-   if (write_cmd_eterm(resp))
-   {
-     // syslog(LOG_NOTICE, "gpio_interrupt for pin %d", pin);
-   }
-   else
-   {
-      syslog(LOG_ERR, "gpio_interrupt failed for pin %d", pin);
-   }
-      
-}
-
-/**
-* @brief Port interface for gpio_set_int
-*/
-int
-port_gpio_set_int (int pin, ETERM* condition_t)
-{
-   char mode[10];
-
-   my_condition = erl_format("~w", condition_t);
-   sprintf(mode, "%s", ERL_ATOM_PTR(condition_t));
-  
-   return gpio_set_int(pin, gpio_isr, mode);
-}
-
-
-
-/**
-* @brief The main function.
-* It waits for data in the buffer and calls the driver.
-*/
-int main() {
-  unsigned char buf[BUF_SIZE];
-  /* char command[MAXATOMLEN]; */
-  /* int index, version, arity; */
-
-
-  ETERM *emsg, *msg_type, *refp, *tuplep, *fnp, *arg1p, *arg2p, *resp;
-
-  
-  int res;
-  /* ei_x_buff result; */
-
-  memset(buf, 0, BUF_SIZE);
-  erl_init(NULL, 0);
-  
-/*  setlogmask( LOG_UPTO (LOG_NOTICE));
- */ 
-  openlog("gpio_port", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
-
-  //syslog(LOG_NOTICE, "openlog done");
-  
-  while ((res = read_cmd(buf)) > 0)
-  {
-     syslog(LOG_NOTICE, "read_cmd done");
-     if ((emsg = erl_decode(buf)) != NULL)
-     {
-    //    syslog(LOG_NOTICE, "erl_decode done");
-     }
-     else
-     {
-        syslog(LOG_ERR, "erl_decode FAILED");
+    const char *edge_mode;
+    switch (pin->int_mode) {
+    case GPIO_INT_NONE:
+        edge_mode = "none";
         break;
-     }
-
-     
-     if ((msg_type = erl_element(1, emsg)) != NULL)
-     {
-      //  syslog(LOG_NOTICE, "erl_element succeeded!");
-        syslog(LOG_NOTICE, "msg_type: %s", ERL_ATOM_PTR(msg_type));
-
-        if (strncmp(ERL_ATOM_PTR(msg_type), "init", 4) == 0)
-           {
-              arg1p = erl_element(2, emsg);
-              arg2p = erl_element(3, emsg);
-              if (arg1p != NULL && arg2p != NULL)
-              {
-                 if (port_gpio_init(arg1p, arg2p))
-                 {
-                    resp = erl_format("ok");
-                 }
-                 else
-                 {
-                    resp = erl_format("{error, gpio_init_fail}");
-                 }
-              }
-              else
-              {
-                 syslog(LOG_ERR,"init arguments incorrect");
-                 resp = erl_format("{error, gpio_init_wrong_arguments}");
-              }
-              if (write_cmd_eterm(resp))
-        //         syslog(LOG_NOTICE, "write_cmd_eterm done for init ");
-        ;
-              else
-                 syslog(LOG_NOTICE, "write_cmd_eterm FAILED for init");
-           }
-           else if (strncmp(ERL_ATOM_PTR(msg_type), "cast", 4) == 0)
-           {
-              if ((arg1p = erl_element(2, emsg))!= NULL)
-              {
-                 if (strncmp(ERL_ATOM_PTR(arg1p), "release", 7) == 0)
-                 {
-                    if (port_gpio_release(my_pin))
-                    {
-          //             syslog(LOG_NOTICE, "gpio_relase went well for pin %d",
-          //                    my_pin);
-                    }
-                    else
-                    {
-                       syslog(LOG_ERR, "gpio_release failed for pin %d", my_pin);
-                    }
-                 }
-              }
-              else
-              {
-                 syslog(LOG_ERR, "release arguments incorrect");
-              }
-           }
-           else if (strncmp(ERL_ATOM_PTR(msg_type), "call", 4) == 0)
-           {
-              refp = erl_element(2, emsg);
-              tuplep = erl_element(3, emsg);
-              if (refp != NULL && tuplep != NULL)
-              {
-                 if ((fnp = erl_element(1, tuplep)) != NULL)
-                 {
-                    if (strncmp(ERL_ATOM_PTR(fnp), "write", 5) == 0)
-                    {
-                       if((arg1p = erl_element(2, tuplep)) != NULL)
-                       {
-                          if(port_gpio_write(my_pin, arg1p))
-                          {
-                             resp = erl_format("ok");
-                          }
-                          else
-                          {
-                             syslog(LOG_ERR, "port write failed");
-                             resp = erl_format("{error, gpio_write_failed}");
-                          }
-                       }
-                       else
-                       {
-                          syslog(LOG_ERR, "call with wrong tuple");
-                          resp = erl_format("{error, call_expected_tuple}");
-                       }
-                 
-                    }
-                    else if (strncmp(ERL_ATOM_PTR(fnp), "read", 4) == 0)
-                    {
-                       if((res =port_gpio_read(my_pin)) !=-1)
-                       {
-                          resp = erl_format("~i",res);
-                       }
-                       else
-                       {
-                          syslog(LOG_ERR, "port read failed");
-                          resp = erl_format("{error, gpio_read_failed}");
-                       }
-                    }
-                    else if (strncmp(ERL_ATOM_PTR(fnp), "set_int", 7) == 0)
-                    {
-                       if((arg1p = erl_element(2, tuplep)) != NULL)
-                       {
-                          if(port_gpio_set_int(my_pin, arg1p))
-                          {
-                             resp = erl_format("ok");
-                          }
-                          else
-                          {
-                             syslog(LOG_ERR, "port set_int failed");
-                             resp = erl_format("{error, gpio_set_int_failed}");
-                          }
-                       } else
-                       {
-                          syslog(LOG_ERR, "call with wrong tuple");
-                          resp = erl_format("{error, call_expected_tuple}");
-                       }
-                    }
-                 }
-                 else
-                 {
-                    syslog(LOG_ERR,"call arguments incorrect");
-                    resp = erl_format("{error, gpio_cal_wrong_arguments}");
-                 }
-              }
-
-              /* Now we can send the response to the caller */
-              if (write_cmd_eterm(erl_format("{port_reply,~w,~w}", refp, resp)))
-              {
-            //     syslog(LOG_NOTICE, "successful reply to call");
-              }
-              else
-              {
-                 syslog(LOG_ERR, "error write_cmd_eterm");
-              }
-           }
-     }
-     else
-     {
-        syslog(LOG_NOTICE, "erl_element FAILED!!!!");
+    case GPIO_INT_RISING:
+        edge_mode = "rising";
         break;
-     }
-  }
+    case GPIO_INT_FALLING:
+        edge_mode = "falling";
+        break;
+    default:
+        edge_mode = "both";
+        break;
+    }
 
-  syslog(LOG_NOTICE, "leaving gpio_port %d", res);
-  
-  closelog();
+    char path[64];
+    sprintf(path, "/sys/class/gpio/gpio%d/edge", pin->pin_number);
+    if (!sysfs_write_file(path, edge_mode))
+        return -1;
 
-  erl_free_term(emsg); erl_free_term(msg_type);
-  /* erl_free_term(fromp); erl_free_term(refp); */
-  /* erl_free_term(tuplep); erl_free_term(fnp); */
-  erl_free_term(arg1p); erl_free_term(arg2p);
-  erl_free_term(resp);
-  
-  return 0;
-  
-     
-/* /\* Reset the index, so that ei functions can decode terms from the  */
-/*      * beginning of the buffer *\/ */
-/*     index = 0; */
-
-/*     /\* Ensure that we are receiving the binary term by reading and  */
-/*      * stripping the version byte *\/ */
-/*     if (ei_decode_version(buf, &index, &version)) return 1; */
-    
-/*     /\* Our marshalling spec is that we are expecting a tuple {Command, Arg1, Arg2, ...} *\/ */
-/*     if (ei_decode_tuple_header(buf, &index, &arity)) return 2; */
-   
-/*     //if (arity != 3) return 3; */
-    
-/*     if (ei_decode_atom(buf, &index, command)) return 4; */
-    
-/*     /\* Prepare the output buffer that will hold {ok, Result} or {error, Reason} *\/ */
-/*     if (ei_x_new_with_version(&result) || ei_x_encode_tuple_header(&result, 2)) return 5; */
-  
-/* 	/\* This is where we handle incoming commands *\/ */
-/* 	if ( !strcmp("gpio_init", command) ) */
-/* 	{ */
-/* 		if (ei_decode_int(buf, &index, &arg1)) return 6; */
-/* 		if (ei_decode_int(buf, &index, &arg2)) return 7; */
-
-/* 		res = port_gpio_init(arg1, arg2);  */
-
-/* 		if ( res ) */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "ok") || ei_x_encode_int(&result, res)) return 8; */
-/* 		} */
-/* 		else */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "fail.")) return 99; */
-/* 		} */
-
-/* 	} */
-/* 	else if( !strcmp("gpio_release", command) ) */
-/* 	{ */
-
-/* 		if (ei_decode_int(buf, &index, &arg1)) return 6; */
-
-/* 		res = port_gpio_release(arg1);  */
-
-/* 		if ( res ) */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "ok") || ei_x_encode_int(&result, res)) return 8; */
-/* 		} */
-/* 		else */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "fail.")) return 99; */
-/* 		} */
-/* 	} */
-/* 	else if( !strcmp("gpio_write", command) ) */
-/* 	{ */
-
-/* 		if (ei_decode_int(buf, &index, &arg1)) return 6; */
-/* 		if (ei_decode_int(buf, &index, &arg2)) return 7; */
-
-/* 		res = port_gpio_write(arg1, arg2);  */
-
-/* 		if ( res ) */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "ok") || ei_x_encode_int(&result, res)) return 8; */
-/* 		} */
-/* 		else */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "fail.")) return 99; */
-/* 		} */
-/* 	} */
-/* 	else if( !strcmp("gpio_read", command) ) */
-/* 	{ */
-
-/* 		if (ei_decode_int(buf, &index, &arg1)) return 6; */
-
-/* 		res = port_gpio_read(arg1);  */
-
-/* 		if ( res ) */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "ok") || ei_x_encode_int(&result, res)) return 8; */
-/* 		} */
-/* 		else */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "fail.")) return 99; */
-/* 		} */
-/* 	} */
-/* 	else if( !strcmp("gpio_set_int", command) ) */
-/* 	{ */
-
-/* 		if (ei_decode_int(buf, &index, &arg1)) return 6; */
-/* 		if (ei_decode_int(buf, &index, &arg2)) return 7; */
-
-/* 		res = port_gpio_set_int(arg1, arg2);  */
-
-/* 		if ( res ) */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "ok") || ei_x_encode_int(&result, res)) return 8; */
-/* 		} */
-/* 		else */
-/* 		{ */
-/* 			if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "fail.")) return 99; */
-/* 		} */
-/* 	} */
-/* 	else { */
-/* 		if (ei_x_encode_atom(&result, "error") || ei_x_encode_atom(&result, "unsupported_command"))  */
-/* 		return 99; */
-/* 	} */
-
-/*     write_cmd(&result); */
-
-/*     ei_x_free(&result); */
-/*   } */
-
+    return 1;
 }
 
+static void gpio_report_interrupt(int pin_number, int is_rising)
+{
+    char resp[256];
+    int resp_index = sizeof(uint16_t) + 1; // Space for payload size and type
+    resp[2] = 1; // Notification
+    ei_encode_version(resp, &resp_index);
+    ei_encode_tuple_header(resp, &resp_index, 3);
+    ei_encode_atom(resp, &resp_index, "gpio_interrupt");
+    ei_encode_long(resp, &resp_index, pin_number);
+    ei_encode_atom(resp, &resp_index, is_rising ? "rising" : "falling");
+    erlcmd_send(resp, resp_index);
+}
 
+/**
+ * Called after poll() returns when the GPIO sysfs file indicates
+ * a status change.
+ *
+ * @param pin which pin to check
+ */
+void gpio_process(struct gpio *pin)
+{
+    int value = gpio_read(pin);
+
+    switch (pin->int_mode) {
+    case GPIO_INT_RISING:
+        /* We don't need to check the value, since we know that
+           Linux wouldn't have notified us if it weren't rising
+           at one time. It could be that the value is 0 if it
+           was a transient, so it would be a race condition if
+           we did use it. */
+        gpio_report_interrupt(pin->pin_number, 1);
+        break;
+
+    case GPIO_INT_FALLING:
+        gpio_report_interrupt(pin->pin_number, 0);
+        break;
+
+    case GPIO_INT_SUMMARIZE:
+        /* If summarizing, only report if different. */
+        if (pin->last_value != value)
+            gpio_report_interrupt(pin->pin_number, value);
+        break;
+
+    case GPIO_INT_BOTH:
+        /* If not summarizing, then if the last value
+         * is the same as the current one, we missed
+         * an interrupt.
+         */
+        if (pin->last_value == value) {
+            /* Send 2 notifications. This seems to be the
+             * best of a bad situation. It would be nice
+             * to avoid calling gpio_read and just toggling
+             * which direction we send, but it doesn't seem
+             * like there's any way to guarantee that we're
+             * in sync since the Linux docs don't provide
+             * one. Sending 2 notifications ensures that
+             * we never send two rising or two falling
+             * notifications in a row, and that seems good
+             * since neither of those notifications make
+             * sense. However, if we're registered for both
+             * sides of the transition, this will probably
+             * double the number of messages that we should
+             * send. If we're sending a lot of transients,
+             * though, it's likely that we missed one anyway,
+             * so I don't feel too bad.
+             */
+            gpio_report_interrupt(pin->pin_number, !value);
+        }
+        gpio_report_interrupt(pin->pin_number, value);
+        break;
+
+    default:
+        break;
+    }
+
+    pin->last_value = value;
+}
+
+void gpio_handle_request(const char *req, void *cookie)
+{
+    struct gpio *pin = (struct gpio *) cookie;
+
+    // Commands are of the form {Command, Arguments}:
+    // { atom(), term() }
+    int req_index = sizeof(uint16_t);
+    if (ei_decode_version(req, &req_index, NULL) < 0)
+        errx(EXIT_FAILURE, "Message version issue?");
+
+    int arity;
+    if (ei_decode_tuple_header(req, &req_index, &arity) < 0 ||
+            arity != 2)
+        errx(EXIT_FAILURE, "expecting {cmd, args} tuple");
+
+    char cmd[MAXATOMLEN];
+    if (ei_decode_atom(req, &req_index, cmd) < 0)
+        errx(EXIT_FAILURE, "expecting command atom");
+
+    char resp[256];
+    int resp_index = sizeof(uint16_t) + 1; // Space for payload size and type
+    resp[2] = 0; // Reply
+    ei_encode_version(resp, &resp_index);
+    if (strcmp(cmd, "read") == 0) {
+        debug("read");
+        int value = gpio_read(pin);
+        if (value !=-1)
+            ei_encode_long(resp, &resp_index, value);
+        else {
+            ei_encode_tuple_header(resp, &resp_index, 2);
+            ei_encode_atom(resp, &resp_index, "error");
+            ei_encode_atom(resp, &resp_index, "gpio_read_failed");
+        }
+    } else if (strcmp(cmd, "write") == 0) {
+        long value;
+        if (ei_decode_long(req, &req_index, &value) < 0)
+            errx(EXIT_FAILURE, "write: didn't get value to write");
+        debug("write %d", value);
+        if (gpio_write(pin, value))
+            ei_encode_atom(resp, &resp_index, "ok");
+        else {
+            ei_encode_tuple_header(resp, &resp_index, 2);
+            ei_encode_atom(resp, &resp_index, "error");
+            ei_encode_atom(resp, &resp_index, "gpio_write_failed");
+        }
+    } else if (strcmp(cmd, "set_int") == 0) {
+        char mode[32];
+        if (ei_decode_atom(req, &req_index, mode) < 0)
+            errx(EXIT_FAILURE, "set_int: didn't get value");
+        debug("set_int %s", mode);
+
+        if (gpio_set_int(pin, mode))
+            ei_encode_atom(resp, &resp_index, "ok");
+        else {
+            ei_encode_tuple_header(resp, &resp_index, 2);
+            ei_encode_atom(resp, &resp_index, "error");
+            ei_encode_atom(resp, &resp_index, "gpio_set_int_failed");
+        }
+    } else
+        errx(EXIT_FAILURE, "unknown command: %s", cmd);
+
+    debug("sending response: %d bytes", resp_index);
+    erlcmd_send(resp, resp_index);
+}
+
+int gpio_main(int argc, char *argv[])
+{
+    if (argc != 4)
+        errx(EXIT_FAILURE, "%s gpio <pin#> <input|output>", argv[0]);
+
+    int pin_number = strtol(argv[2], NULL, 0);
+    enum gpio_state initial_state;
+    if (strcmp(argv[3], "input") == 0)
+        initial_state = GPIO_INPUT;
+    else if (strcmp(argv[3], "output") == 0)
+        initial_state = GPIO_OUTPUT;
+    else
+        errx(EXIT_FAILURE, "Specify 'input' or 'output'");
+
+    struct gpio pin;
+    if (gpio_init(&pin, pin_number, initial_state) < 0)
+	errx(EXIT_FAILURE, "Couldn't initialize gpio %d\n", pin_number);
+
+    struct erlcmd handler;
+    erlcmd_init(&handler, gpio_handle_request, &pin);
+
+    for (;;) {
+        struct pollfd fdset[2];
+
+        fdset[0].fd = STDIN_FILENO;
+        fdset[0].events = POLLIN;
+        fdset[0].revents = 0;
+
+        fdset[1].fd = pin.fd;
+        fdset[1].events = POLLPRI;
+        fdset[1].revents = 0;
+
+        /* Always fill out the fdset structure, but only have poll() monitor
+     * the sysfs file if interrupts are enabled.
+     */
+        int rc = poll(fdset, pin.int_mode != GPIO_INT_NONE ? 2 : 1, -1);
+        if (rc < 0) {
+            // Retry if EINTR
+            if (errno == EINTR)
+                continue;
+
+            err(EXIT_FAILURE, "poll");
+        }
+
+        if (fdset[0].revents & (POLLIN | POLLHUP))
+            erlcmd_process(&handler);
+
+        if (fdset[1].revents & POLLPRI)
+            gpio_process(&pin);
+    }
+
+    return 0;
+}

@@ -1,8 +1,9 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
+%%% @author Frank Hunleth <fhunleth@troodon-software.com>
 %%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @doc This is the implementation of the SPI interface module.
-%%% There is one process for each spi device. Each process is linked to the supervisor
-%%% of the spi application.
+%%% @copyright (C) 2015, Frank Hunleth
+%%% @doc
+%%% This is the implementation of the SPI interface module.
 %%% @end
 
 -module(spi).
@@ -10,56 +11,47 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/1]).
--export([config/5, transfer/3]).
+-export([start_link/2, start_link/3, stop/1]).
+-export([transfer/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE). 
--define (SPILIBRARY, "priv/spi_lib").
+-define(SERVER, ?MODULE).
 
--type mode() :: integer().
--type data() :: tuple().
--type bits() :: integer().
--type delay() :: integer().
--type speed() :: integer().
--type len() :: integer().
+-type data() :: binary().
 -type devname() :: string().
--type channel() :: atom().
+-type server_ref() :: atom() | {atom(), atom()} | pid().
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 %% @doc
-%% Starts the process with the channel name and Initialize the devname device.
-%% You can identify the device by a channel name. Each cannel drive a devname device.
+%% Starts the process and initialize the device.
 %% @end
--spec(start_link({channel(), devname()}) -> {ok, pid()} | {error, reason}).
-start_link({Channel, Devname}) ->
-    gen_server:start_link({local, Channel}, ?MODULE, Devname, []).
+-spec(start_link(term(), devname(), list()) -> {ok, pid()} | {error, reason}).
+start_link(ServerName, Devname, SpiOptions) ->
+    gen_server:start_link(ServerName, ?MODULE, {Devname, SpiOptions}, []).
+
+-spec(start_link(devname(), list()) -> {ok, pid()} | {error, reason}).
+start_link(Devname, SpiOptions) ->
+    gen_server:start_link(?MODULE, {Devname, SpiOptions}, []).
 
 %% @doc
 %% Stop the process channel and release it.
 %% @end
-stop(Channel) ->
-    gen_server:cast(Channel, stop).
-
-%% @doc
-%% Configure the SPI device.
-%% @end
--spec(config(channel(), mode(), bits(), speed(), delay()) -> ok | {error, reason}).
-config(Channel, Mode, Bits, Speed, Delay) ->
-    gen_server:call(Channel, {call, config, Mode, Bits, Speed, Delay}).
+-spec(stop(server_ref()) -> ok).
+stop(ServerRef) ->
+    gen_server:cast(ServerRef, stop).
 
 %% @doc
 %% Transfer data trough the SPI bus.
 %% @end
--spec(transfer(channel(), data(), len()) -> {data()} | {error, reason}).
-transfer(Channel, Data, Len) ->
-    gen_server:call(Channel, {call, transfer, Data, Len}).
+-spec(transfer(server_ref(), data()) -> data() | {error, reason}).
+transfer(ServerRef, Data) ->
+    gen_server:call(ServerRef, {transfer, Data}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -76,9 +68,18 @@ transfer(Channel, Data, Len) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init(Devname) ->
-    Port = open_port({spawn, ?SPILIBRARY}, [{packet, 2}, binary]),
-    spi_init(Port, Devname),
+init({Devname, SpiOptions}) ->
+    Mode = keyword_get(SpiOptions, mode, 0),
+    BitsPerWord = keyword_get(SpiOptions, bits_per_word, 8),
+    SpeedHz = keyword_get(SpiOptions, speed_hz, 1000000),
+    DelayUs = keyword_get(SpiOptions, delay_us, 10),
+
+    Port = ale_util:open_port(["spi",
+                               "/dev/" ++ Devname,
+                               integer_to_list(Mode),
+                               integer_to_list(BitsPerWord),
+                               integer_to_list(SpeedHz),
+                               integer_to_list(DelayUs)]),
     {ok, Port}.
 
 %%--------------------------------------------------------------------
@@ -95,25 +96,9 @@ init(Devname) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({call, config, Mode, Bits, Speed, Delay}, _From, State) ->
-    case port_lib:sync_call_to_port(State, {spi_config, Mode, Bits, Speed, Delay}) < 0 of
-	true ->
-	    Reply = {error, spi_configuration_error};
-	false ->
-	    Reply = ok
-    end,
-    {reply, Reply, State};
-
-handle_call({call, transfer, Data, Len}, _From, State) ->
-    Res = port_lib:sync_call_to_port(State, {spi_transfer, Data, Len}),
-    case Res of
-	-1 ->
-	    Reply = {error, spi_transfer_error};
-	Reply ->
-	    ok
-    end,
+handle_call({transfer, Data}, _From, State) ->
+    Reply = call_port(State, transfer, Data),
     {reply, Reply, State}.
-
 
 %%--------------------------------------------------------------------
 %% @private
@@ -170,13 +155,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+keyword_get(Keywords, Key, Default) ->
+    case lists:keyfind(Key, 1, Keywords) of
+        {Key, Value} -> Value;
+        false -> Default
+    end.
 
-%% @doc Initialize the SPI devname device.
-%% @end
-spi_init(Port, Devname) ->
-    case port_lib:sync_call_to_port(Port, {spi_init, Devname}) < 0 of
-	true ->
-	    exit({error, spi_initialization_error});
-	false ->
-	    ok
+
+call_port(Port, Command, Args) ->
+    Message = {Command, Args},
+    erlang:send(Port, {self(), {command, term_to_binary(Message)}}),
+    receive
+        {_, {data, Response}} -> binary_to_term(Response)
     end.
