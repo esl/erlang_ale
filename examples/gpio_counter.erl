@@ -19,7 +19,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE). 
+-define(SERVER, ?MODULE).
 
 -define(UP_PIN, 22).
 -define(DOWN_PIN, 17).
@@ -27,7 +27,11 @@
 -define(TWOS_PIN, 23).
 
 -record(state,
-        { count = 0 :: 0..3}).
+        { count = 0 :: 0..3,
+          up_pin,
+          down_pin,
+          ones_pin,
+          twos_pin }).
 
 %%%===================================================================
 %%% API
@@ -41,13 +45,16 @@ start_link() ->
 %%%===================================================================
 
 init([]) ->
-    {ok, _} = gpio:start_link({?UP_PIN, input}),
-    {ok, _} = gpio:start_link({?DOWN_PIN, input}),
-    ok = gpio:set_int(?UP_PIN, rising),
-    ok = gpio:set_int(?DOWN_PIN, rising),
-    {ok, _} = gpio:start_link({?ONES_PIN, output}),
-    {ok, _} = gpio:start_link({?TWOS_PIN, output}),
-    {ok, #state{}}.
+    {ok, UpPin} = gpio:start_link(?UP_PIN, input),
+    {ok, DownPin} = gpio:start_link(?DOWN_PIN, input),
+    ok = gpio:set_int(UpPin, rising),
+    ok = gpio:set_int(DownPin, rising),
+    ok = gpio:register_int(UpPin),
+    ok = gpio:register_int(DownPin),
+    {ok, OnesPin} = gpio:start_link(?ONES_PIN, output),
+    {ok, TwosPin} = gpio:start_link(?TWOS_PIN, output),
+    io:format("GPIO ~p counts up, and GPIO ~p counts down~n", [?UP_PIN, ?DOWN_PIN]),
+    {ok, #state{up_pin=UpPin, down_pin=DownPin, ones_pin=OnesPin, twos_pin=TwosPin}}.
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -59,12 +66,12 @@ handle_cast(_Msg, State) ->
 handle_info({gpio_interrupt, ?UP_PIN, rising},
             #state{count=N}=State)  when N < 3 ->
     N1 = N + 1,
-    set_counter_pins(N1),
+    set_counter_pins(State, N1),
     {noreply, State#state{count=N1}};
 handle_info({gpio_interrupt, ?DOWN_PIN, rising},
             #state{count=N}=State) when N > 0 ->
     N1 = N - 1,
-    set_counter_pins(N1),
+    set_counter_pins(State, N1),
     {noreply, State#state{count=N1}};
 handle_info({gpio_interrupt, _Pin, _Condition},
             State) ->
@@ -79,10 +86,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-set_counter_pins(N1) ->
+set_counter_pins(#state{ones_pin=OnesPin, twos_pin=TwosPin}, N1) ->
     <<Twos:1, Ones:1>> = <<N1:2>>,
-    gpio:write(?ONES_PIN, Ones),
-    gpio:write(?TWOS_PIN, Twos).
+    gpio:write(OnesPin, Ones),
+    gpio:write(TwosPin, Twos).
 
 
 
