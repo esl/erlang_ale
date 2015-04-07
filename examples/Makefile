@@ -1,4 +1,9 @@
-ALE_EBIN_DIR=$(abspath $(wildcard ../_build/default/lib))/*/ebin
+REBAR3_LIB_DIR=$(abspath $(wildcard ../_build/default/lib))
+ifeq ($(strip ${REBAR3_LIB_DIR}),)
+	ALE_EBIN_DIR=$(abspath ../ebin)
+else
+	ALE_EBIN_DIR=${REBAR3_LIB_DIR}/*/ebin 
+endif
 
 all: compile
 
