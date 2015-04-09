@@ -20,9 +20,10 @@
 
 -define(SERVER, ?MODULE).
 
--type data() :: binary().
--type devname() :: string().
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 %%%===================================================================
 %%% API

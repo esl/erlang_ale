@@ -8,9 +8,15 @@ endif
 all: compile
 
 compile:
-	erlc *.erl
+	erlc -I ../include/ *.erl
+	
+clean:
+	rm -rf *.beam
 
 gpio_counter: compile
 	erl -pa ${ALE_EBIN_DIR} -pa . -run gpio_counter start_link
 
-.PHONY: all compile gpio_counter
+ale_handler_gpio_int_test: compile
+	erl -pa ${ALE_EBIN_DIR} -pa . -run ale_handler_gpio_int_test start_link
+	
+.PHONY: all compile clean gpio_counter

@@ -20,11 +20,10 @@
 
 -define(SERVER, ?MODULE).
 
--type addr() :: integer(). %% fix to be 2-127
--type data() :: binary().
--type len() :: integer().
--type devname() :: string().
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 %%%===================================================================
 %%% API
