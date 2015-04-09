@@ -50,8 +50,17 @@
 -export([
 		 gpio_read/1,
 		 gpio_write/2,
-		 gpio_set_int/2, gpio_set_int/3
+		 gpio_set_int/2, gpio_set_int/3,
+		 gpio_release/1
  		 ]).
+
+%% I2C related functions
+-export([
+		 i2c_init/2,
+		 i2c_stop/2,
+		 i2c_write/3,
+		 i2c_read/3
+		 ]).
 
 %% ====================================================================
 %% Behavioural functions 
@@ -145,6 +154,96 @@ gpio_set_int(Gpio, IntCondition, Destination) when is_integer(Gpio) ->
 gpio_set_int(Gpio, _IntCondition, _Destination) ->
 	{error, {invalid_gpio, Gpio}}.
 
+%% ====================================================================
+%% @doc
+%% Release Gpio. 
+%% @end
+%% ====================================================================
+gpio_release(Gpio) when is_integer(Gpio) ->
+	%% Start ALE handler if not started yet.
+	start(),
+	
+	case catch gen_server:call(?SERVER, {gpio_release, Gpio}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		ok ->
+			ok;
+		ER->ER
+	end;
+gpio_release(Gpio) ->
+	{error, {invalid_gpio, Gpio}}.
+
+%% ====================================================================
+%% @doc
+%% Initialize I2C driver.
+%% @end
+-spec i2c_init(devname(), addr()) -> ok | {error, term()}.
+%% ====================================================================
+i2c_init(DeviceName, HWAddress) ->
+	%% Start ALE handler if not started yet.
+	start(),
+	
+	case catch gen_server:call(?SERVER, {i2c_init, DeviceName, HWAddress}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		ok ->
+			ok;
+		ER->ER
+	end.
+
+%% ====================================================================
+%% @doc
+%% Stop I2C driver.
+%% @end
+-spec i2c_stop(devname(), addr()) -> ok | {error, term()}.
+%% ====================================================================
+i2c_stop(DeviceName, HWAddress) ->
+	%% Start ALE handler if not started yet.
+	start(),
+	
+	case catch gen_server:call(?SERVER, {i2c_stop, DeviceName, HWAddress}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		ok ->
+			ok;
+		ER->ER
+	end.
+
+%% ====================================================================
+%% @doc
+%% Write by into I2C device.
+%% @end
+-spec i2c_write(devname(), addr(), data()) -> ok | {error, term()}.
+%% ====================================================================
+i2c_write(DeviceName, HWAddress, Data) ->
+	%% Start ALE handler if not started yet.
+	start(),
+	
+	case catch gen_server:call(?SERVER, {i2c_write, DeviceName, HWAddress, Data}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		ok ->
+			ok;
+		ER->ER
+	end.
+
+%% ====================================================================
+%% @doc
+%% Read data from I2C device.
+%% @end
+-spec i2c_read(devname(), addr(), len()) -> {ok, data()} | {error, term()}.
+%% ====================================================================
+i2c_read(DeviceName, HWAddress, Len) ->
+	%% Start ALE handler if not started yet.
+	start(),
+	
+	case catch gen_server:call(?SERVER, {i2c_read, DeviceName, HWAddress, Len}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		{ok, Data} ->
+			{ok, Data};
+		ER->ER
+	end.
 
 %% init/1
 %% ====================================================================
@@ -230,6 +329,64 @@ handle_call({gpio_set_int, Gpio, IntCondition, Destination}, _From, State) ->
 	
 	{reply, Reply, State};
 
+handle_call({gpio_release, Gpio}, _From, State) ->
+	case get_driver_process(gpio, Gpio) of
+		{ok,R} ->
+			Reply = stop_driver_process(R#rALEHandler.drvPid),
+			{reply, Reply, State};
+		
+		ER->{reply, ER, State}
+	end;
+							
+handle_call({i2c_init, DeviceName, HWAddress}, _From, State) ->
+	Reply = case start_driver_process({?MODULE, i2c_init,  [DeviceName, HWAddress]}, ?DRV_I2C_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, HWAddress]) of
+				{ok, _DrvPid} ->
+					ok;
+				{error, R} ->
+					{error, R}
+			end,
+	{reply, Reply, State};
+
+handle_call({i2c_stop, DeviceName, HWAddress}, _From, State) ->
+	Reply = case get_driver_process(?DRV_I2C_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, HWAddress]) of
+				{ok, R} ->
+					stop_driver_process(R#rALEHandler.drvPid);
+					
+				ER->
+					ER
+			end,
+	{reply, Reply, State};
+	
+handle_call({i2c_write, DeviceName, HWAddress, Data}, _From, State) ->
+	Reply = case start_driver_process({?MODULE, i2c_write,  [DeviceName, HWAddress, Data]}, ?DRV_I2C_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, HWAddress]) of
+				{ok, DrvPid} ->
+					%% Write data into the I2C device.
+					case erlang:apply(?DRV_I2C_MODULE, write, [DrvPid, Data]) of
+						ok ->
+							ok;
+						{error,R} ->
+							{error,R}
+					end;
+				{error, R} ->
+					{error, R}
+			end,
+	{reply, Reply, State};
+
+handle_call({i2c_read, DeviceName, HWAddress, Len}, _From, State) ->
+	Reply = case start_driver_process({?MODULE, i2c_read,  [DeviceName, HWAddress, Len]}, ?DRV_I2C_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, HWAddress]) of
+				{ok, DrvPid} ->
+					%% Read data from the I2C device.
+					case erlang:apply(?DRV_I2C_MODULE, read, [DrvPid, Len]) of
+						Data when is_binary(Data) ->
+							Data;
+						{error,R} ->
+							{error,R}
+					end;
+				{error, R} ->
+					{error, R}
+			end,
+	{reply, Reply, State};
+	
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -272,7 +429,7 @@ handle_info({'DOWN', MonitorRef, Type, Object, Info}, State) ->
 							   {info, Info}]),
 	
 	%% Try find the MonitorRef belongs to which driver process, and what the codition of that.
-	case get_driver_process(MonitorRef) of
+	case get_driver_process(monitorRef, MonitorRef) of
 		{ok, R} ->
 			%% Get the MFA for initial setup. Execute that once the record has been deleted in ETS table.
 			ets:delete(?ALE_HANDLER_TABLE, R#rALEHandler.key),
@@ -326,19 +483,22 @@ code_change(_OldVsn, State, _Extra) ->
 %% ====================================================================
 %% Find driver process
 %% Input:
-%%		MFA | MonitorRef, where MFA is
-%%									DrvModule			:	atom
-%%									DrvStartFunction	:	atom
-%%									Arg					:	list, [term()]
-%%								MonitorRef is			:	reference(). See erlang:monitor/2.
+%%		DrvModule			:	atom
+%%		DrvStartFunction	:	atom
+%%		Arg					:	list, [term()]
 %% Output:
 %%		{ok,rALEHandler{}} | {error, term()}
 %% ====================================================================
-get_driver_process({DrvModule, _DrvStartFunction, Arg}) ->
+get_driver_process(DrvModule, _DrvStartFunction, Arg) ->
 	Key = case DrvModule of
 			  ?DRV_GPIO_MODULE ->
 				  [Gpio, PinDirection] = Arg,
 				  {?DRV_GPIO_MODULE, Gpio, PinDirection};
+			  
+			  ?DRV_I2C_MODULE ->
+				  [DeviceName, HWAddress] = Arg,
+				  {?DRV_I2C_MODULE, DeviceName, HWAddress};
+			  
 			  _-> %% Unsupported scenario.
 				  %% FIXME
 				  {error, {unsupported_drv_module, DrvModule}}
@@ -351,8 +511,9 @@ get_driver_process({DrvModule, _DrvStartFunction, Arg}) ->
 					{ok, R};
 				ER->{error, ER}
 			end
-	end;
-get_driver_process(MonitorRef) ->
+	end.
+
+get_driver_process(monitorRef, MonitorRef) ->
 	%% Search for driver process by its MonitorRef.
 	case ets:match_object(?ALE_HANDLER_TABLE, #rALEHandler{monitorRef = MonitorRef, _='_'}) of
 		[R] when is_record(R, rALEHandler) ->
@@ -361,21 +522,31 @@ get_driver_process(MonitorRef) ->
 			{error, {driver_was_started_multiple_times, {monitorRef, {MonitorRef, Recs}}}};
 		ER ->
 			{error, ER}
+	end;
+get_driver_process(gpio, Gpio) ->
+	%% Search for driver process by its gpio.
+	case ets:match_object(?ALE_HANDLER_TABLE, #rALEHandler{key = {'_', Gpio, '_'}, _='_'}) of
+		[R] when is_record(R, rALEHandler) ->
+			{ok, R};
+		Recs when is_list(Recs) ->
+			{error, {driver_was_started_multiple_times, {gpio, {Gpio, Recs}}}};
+		ER ->
+			{error, ER}
 	end.
 
 %% ====================================================================
 %% Start driver process if not started yet.
 %% Input:
-%%		InitialMFA			:	tuple, the MFA of initial setup of driver process.
-%%		DrvModule			:	atom
-%%		DrvStartFunction	:	atom
-%%		Arg					:	list, [term()]
+%%		InitialMFA			: tuple, the MFA of initial setup of driver process.
+%%		DrvModule			: atom
+%%		DrvStartFunction	: atom
+%%		Arg					: list, [term()]
 %% Output:
 %%		{ok,pid()} | {ok,do_register_monitor,pid()} | {error, term()}
 %% ====================================================================
 start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 	%% Start driver process if not started yet.
-	case get_driver_process({DrvModule, DrvStartFunction, Arg}) of
+	case get_driver_process(DrvModule, DrvStartFunction, Arg) of
 		{ok,R} ->
 			%% Driver process already started. No need to do anything.
 			{ok, R#rALEHandler.drvPid};
@@ -406,6 +577,11 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 									{ok, {?DRV_GPIO_MODULE, Gpio, PinDirection}, Pid};
 								ER->ER
 							end;
+						
+						?DRV_I2C_MODULE ->
+							[DeviceName, HWAddress] = Arg,
+							{ok, {?DRV_I2C_MODULE, DeviceName, HWAddress}, Pid};
+						
 						_->	%% Unsupported scenario.
 							%% FIXME
 							{error, {unsupported_drv_module, DrvModule}}
@@ -450,25 +626,64 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 %% Output:
 %%		ok | {error, term()}
 %% ====================================================================
-%% stop_driver_process(DrvPid) ->
-%% 	case erlang:is_process_alive(DrvPid) of
-%% 		true ->
-%% 			%% Process is alive.
-%% 			case ets:match_object(?ALE_HANDLER_TABLE, #rALEHandler{drvPid = DrvPid, _='_'}) of
-%% 				[R] when is_record(R, rALEHandler) ->
-%% 					{DrvModule,_,_} = R#rALEHandler.key,
-%% 					case erlang:apply(DrvModule, ?STOP_FUNC_DRV_MODULE, [DrvPid]) of
-%% 						ok ->
-%% 							ok;
-%% 						ER->{error, ER}
-%% 					end;
-%% 				Recs when is_list(Recs) ->
-%% 					%% Upps, this is a major error, because driver was started multiple times with the same attributes,
-%% 					%% what is not allowed.
-%% 					{error, {driver_was_started_multiple_times, {DrvPid, Recs}}}
-%% 			end;
-%% 			
-%% 		false ->
-%% 			%% Process does not alive.
-%% 			{error, {process_is_not_alive, DrvPid}}
-%% 	end.
+stop_driver_process(DrvPid) ->
+	case erlang:is_process_alive(DrvPid) of
+		true ->
+			%% Process is alive.
+			case ets:match_object(?ALE_HANDLER_TABLE, #rALEHandler{drvPid = DrvPid, _='_'}) of
+				[R] when is_record(R, rALEHandler) ->
+					SpecialCaseRes = case erlang:element(1, R#rALEHandler.key) of
+										 ?DRV_GPIO_MODULE ->
+											 case R#rALEHandler.initialMFA of
+												 {?MODULE, gpio_set_int, [_Gpio, _IntCondition, Destination]} ->
+													 %% Unregister interrupt process
+													 case erlang:apply(?DRV_GPIO_MODULE, unregister_int, [R#rALEHandler.drvPid, Destination]) of
+														 ok ->
+															 {ok, ?DRV_GPIO_MODULE};
+														 {error, R} ->
+															 {error, R}
+													 end;
+												 _-> %% Normal IO GPIO, so no interrupt has been configured.
+													 {ok, ?DRV_GPIO_MODULE}
+											 end;
+										 
+										 ?DRV_I2C_MODULE ->
+											 {ok, ?DRV_I2C_MODULE};
+										 
+										 DrvModuleT ->
+											 {error, {unsupported_drv_module, DrvModuleT}}
+									 end,
+					case SpecialCaseRes of
+						{ok, DrvModule} ->
+							%% Stop monitor the driver process
+							erlang:demonitor(R#rALEHandler.monitorRef, [flush, info]),
+							
+							%% Stop driver process
+							erlang:apply(DrvModule, ?STOP_FUNC_DRV_MODULE, [R#rALEHandler.drvPid]),
+							
+							%% Delete record in ETS
+							ets:delete(?ALE_HANDLER_TABLE, R#rALEHandler.key),
+							
+							error_logger:info_report(["ALE driver has been released.",
+													  {drvPid, DrvPid},
+													  {record_in_ets, R}]),
+							ok;
+								
+						ER->
+							error_logger:error_report(["Failed to release ALE driver.",
+													   {drvPid, DrvPid},
+													   {record_in_ets, R},
+													   {reason, ER}]),
+							ER
+					end;
+					
+				Recs when is_list(Recs) ->
+					%% Upps, this is a major error, because driver was started multiple times with the same attributes,
+					%% what is not allowed.
+					{error, {driver_was_started_multiple_times, {DrvPid, Recs}}}
+			end;
+			
+		false ->
+			%% Process does not alive.
+			{error, {process_is_not_alive, DrvPid}}
+	end.
