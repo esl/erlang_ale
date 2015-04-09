@@ -44,7 +44,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start/0]).
+-export([start_link/0]).
 
 %% Gpio related functions
 -export([
@@ -56,11 +56,17 @@
 
 %% I2C related functions
 -export([
-		 i2c_init/2,
+		 %%i2c_init/2,
 		 i2c_stop/2,
 		 i2c_write/3,
 		 i2c_read/3
 		 ]).
+
+%% SPI related functions
+-export([
+		 %%spi_init/2,
+		 spi_transfer/3
+		]).
 
 %% ====================================================================
 %% Behavioural functions 
@@ -72,7 +78,7 @@
 %% Start ALE handler.
 %% @end
 %% ====================================================================
-start() ->
+start_link() ->
 	case whereis(?SERVER) of
 		Pid when is_pid(Pid) ->
 			%% ALE handler server is alive. Do nothing here.
@@ -90,7 +96,7 @@ start() ->
 %% ====================================================================
 gpio_read(Gpio) when is_integer(Gpio) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {gpio_read, Gpio}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
@@ -111,7 +117,7 @@ gpio_read(Gpio) ->
 %% ====================================================================
 gpio_write(Gpio, PinState) when is_integer(Gpio), ((PinState == ?PIN_STATE_HIGH) or (PinState == ?PIN_STATE_LOW)) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {gpio_write, Gpio, PinState}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
@@ -142,7 +148,7 @@ gpio_set_int(Gpio, IntCondition) when is_integer(Gpio) ->
 %% ====================================================================
 gpio_set_int(Gpio, IntCondition, Destination) when is_integer(Gpio) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {gpio_set_int, Gpio, IntCondition, Destination}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
@@ -161,7 +167,7 @@ gpio_set_int(Gpio, _IntCondition, _Destination) ->
 %% ====================================================================
 gpio_release(Gpio) when is_integer(Gpio) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {gpio_release, Gpio}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
@@ -173,23 +179,23 @@ gpio_release(Gpio) when is_integer(Gpio) ->
 gpio_release(Gpio) ->
 	{error, {invalid_gpio, Gpio}}.
 
-%% ====================================================================
-%% @doc
-%% Initialize I2C driver.
-%% @end
--spec i2c_init(devname(), addr()) -> ok | {error, term()}.
-%% ====================================================================
-i2c_init(DeviceName, HWAddress) ->
-	%% Start ALE handler if not started yet.
-	start(),
-	
-	case catch gen_server:call(?SERVER, {i2c_init, DeviceName, HWAddress}, ?TIMEOUT_FOR_OPERATION) of
-		{'EXIT',R} ->
-			{error, {'EXIT',R}};
-		ok ->
-			ok;
-		ER->ER
-	end.
+%% %% ====================================================================
+%% %% @doc
+%% %% Initialize I2C driver.
+%% %% @end
+%% -spec i2c_init(devname(), addr()) -> ok | {error, term()}.
+%% %% ====================================================================
+%% i2c_init(DeviceName, HWAddress) ->
+%% 	%% Start ALE handler if not started yet.
+%% 	start_link(),
+%% 	
+%% 	case catch gen_server:call(?SERVER, {i2c_init, DeviceName, HWAddress}, ?TIMEOUT_FOR_OPERATION) of
+%% 		{'EXIT',R} ->
+%% 			{error, {'EXIT',R}};
+%% 		ok ->
+%% 			ok;
+%% 		ER->ER
+%% 	end.
 
 %% ====================================================================
 %% @doc
@@ -199,7 +205,7 @@ i2c_init(DeviceName, HWAddress) ->
 %% ====================================================================
 i2c_stop(DeviceName, HWAddress) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {i2c_stop, DeviceName, HWAddress}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
@@ -217,7 +223,7 @@ i2c_stop(DeviceName, HWAddress) ->
 %% ====================================================================
 i2c_write(DeviceName, HWAddress, Data) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {i2c_write, DeviceName, HWAddress, Data}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
@@ -235,9 +241,45 @@ i2c_write(DeviceName, HWAddress, Data) ->
 %% ====================================================================
 i2c_read(DeviceName, HWAddress, Len) ->
 	%% Start ALE handler if not started yet.
-	start(),
+	start_link(),
 	
 	case catch gen_server:call(?SERVER, {i2c_read, DeviceName, HWAddress, Len}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		{ok, Data} ->
+			{ok, Data};
+		ER->ER
+	end.
+
+%% %% ====================================================================
+%% %% @doc
+%% %% Init SPI driver.
+%% %% @end
+%% -spec spi_init(devname(), list()) -> ok | {error, term()}.
+%% %% ====================================================================
+%% spi_init(DeviceName, SpiOptions) ->
+%% 	%% Start ALE handler if not started yet.
+%% 	start_link(),
+%% 	
+%% 	case catch gen_server:call(?SERVER, {spi_init, DeviceName, SpiOptions}, ?TIMEOUT_FOR_OPERATION) of
+%% 		{'EXIT',R} ->
+%% 			{error, {'EXIT',R}};
+%% 		ok ->
+%% 			ok;
+%% 		ER->ER
+%% 	end.
+
+%% ====================================================================
+%% @doc
+%% Transfer data into/from SPI device.
+%% @end
+-spec spi_transfer(devname(), list(), data()) -> {ok, data()} | {error, term()}.
+%% ====================================================================
+spi_transfer(DeviceName, SpiOptions, Data) ->
+	%% Start ALE handler if not started yet.
+	start_link(),
+	
+	case catch gen_server:call(?SERVER, {spi_transfer, DeviceName, SpiOptions, Data}, ?TIMEOUT_FOR_OPERATION) of
 		{'EXIT',R} ->
 			{error, {'EXIT',R}};
 		{ok, Data} ->
@@ -378,7 +420,31 @@ handle_call({i2c_read, DeviceName, HWAddress, Len}, _From, State) ->
 					%% Read data from the I2C device.
 					case erlang:apply(?DRV_I2C_MODULE, read, [DrvPid, Len]) of
 						Data when is_binary(Data) ->
-							Data;
+							{ok, Data};
+						{error,R} ->
+							{error,R}
+					end;
+				{error, R} ->
+					{error, R}
+			end,
+	{reply, Reply, State};
+	
+handle_call({spi_init, DeviceName, SpiOptions}, _From, State) ->
+	Reply = case start_driver_process({?MODULE, spi_init,  [DeviceName, SpiOptions]}, ?DRV_SPI_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, SpiOptions]) of
+				{ok, _DrvPid} ->
+					ok;
+				{error, R} ->
+					{error, R}
+			end,
+	{reply, Reply, State};
+
+handle_call({spi_transfer, DeviceName, SpiOptions, Data}, _From, State) ->
+	Reply = case start_driver_process({?MODULE, spi_transfer,  [DeviceName, SpiOptions, Data]}, ?DRV_SPI_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, SpiOptions]) of
+				{ok, DrvPid} ->
+					%% Transfer data from/to the SPI device.
+					case erlang:apply(?DRV_SPI_MODULE, transfer, [DrvPid, Data]) of
+						DataReceived when is_binary(DataReceived) ->
+							{ok, DataReceived};
 						{error,R} ->
 							{error,R}
 					end;
@@ -499,6 +565,10 @@ get_driver_process(DrvModule, _DrvStartFunction, Arg) ->
 				  [DeviceName, HWAddress] = Arg,
 				  {?DRV_I2C_MODULE, DeviceName, HWAddress};
 			  
+			  ?DRV_SPI_MODULE ->
+				  [DeviceName, SpiOptions] = Arg,
+				  {?DRV_SPI_MODULE, DeviceName, SpiOptions};
+			  
 			  _-> %% Unsupported scenario.
 				  %% FIXME
 				  {error, {unsupported_drv_module, DrvModule}}
@@ -582,6 +652,10 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 							[DeviceName, HWAddress] = Arg,
 							{ok, {?DRV_I2C_MODULE, DeviceName, HWAddress}, Pid};
 						
+						?DRV_SPI_MODULE ->
+							[DeviceName, SpiOptions] = Arg,
+							{ok, {?DRV_SPI_MODULE, DeviceName, SpiOptions}, Pid};
+						
 						_->	%% Unsupported scenario.
 							%% FIXME
 							{error, {unsupported_drv_module, DrvModule}}
@@ -649,6 +723,9 @@ stop_driver_process(DrvPid) ->
 										 
 										 ?DRV_I2C_MODULE ->
 											 {ok, ?DRV_I2C_MODULE};
+										 
+										 ?DRV_SPI_MODULE ->
+											 {ok, ?DRV_SPI_MODULE};
 										 
 										 DrvModuleT ->
 											 {error, {unsupported_drv_module, DrvModuleT}}
