@@ -676,7 +676,12 @@ stop_driver_process(DrvPid) ->
 													   {reason, ER}]),
 							ER
 					end;
-					
+				
+				[] ->
+					error_logger:warning_report(["ALE driver does not started.",
+											  {drvPid, DrvPid}]),
+					ok;
+				
 				Recs when is_list(Recs) ->
 					%% Upps, this is a major error, because driver was started multiple times with the same attributes,
 					%% what is not allowed.
