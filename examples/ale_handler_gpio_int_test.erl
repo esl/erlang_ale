@@ -74,7 +74,11 @@ release_btn()->
 %% ====================================================================
 %% Behavioural functions 
 %% ====================================================================
--record(state, {}).
+-record(state, {
+				ignoreInterrupt	= true :: boolean()	%% There is a known issue an "extra" interrupt has been received
+													%% immediately after interrupt has been configured.
+													%% So keep this value to true, and change it to false when the interrupt has been received.
+				}).
 
 %% init/1
 %% ====================================================================
@@ -164,8 +168,14 @@ handle_cast(_Msg, State) ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 handle_info({gpio_interrupt, Pin, Condition},State) ->
-	error_logger:info_report(["Interrupt has been occurred.", {gpio, Pin}, {interrupt_condition, Condition}]),
-    {noreply, State};
+	case State#state.ignoreInterrupt of
+		true ->
+			%% Ignore the interrupt, because this is an interrupt after the interrupt driver has been configured.
+			{noreply, State#state{ignoreInterrupt = false}};
+		false ->
+			error_logger:info_report(["Interrupt has been occurred.", {gpio, Pin}, {interrupt_condition, Condition}]),
+    		{noreply, State}
+	end;
 
 handle_info(_Info, State) ->
     {noreply, State}.

@@ -5,7 +5,7 @@ else
 	ALE_EBIN_DIR=${REBAR3_LIB_DIR}/*/ebin 
 endif
 
-all: compile
+all: clean compile
 
 compile:
 	erlc -I ../include/ *.erl
