@@ -47,8 +47,9 @@ expander devices.
 				PIN18 - VDD
 				PIN21 - LED with 470ohm serial resistor -> VSS
 				
-				Here is the schematic about circuit
-![I2C schematic](../doc/images/schematic-ex_start_i2c_blinking_led.png)
+Here is the schematic about circuit:
+
+![I2C LED BLINKING schematic](../doc/images/schematic-ex_start_i2c_blinking_led.png)
 		
 		HwAddr	: 16#20, because all Ax PINs are connected to VSS (Ground)
 		Port	: IO expander device has 2 Ports, 'A' and 'B'. In this example we are using Port 'A'.
