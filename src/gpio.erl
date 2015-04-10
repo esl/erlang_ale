@@ -11,8 +11,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2,
-         start_link/3,
+-export([start/2, start_link/2,
+         start/3, start_link/3,
          stop/1,
          write/2,
          read/1,
@@ -30,11 +30,10 @@
 -define(REPLY, 0).
 -define(NOTIFICATION, 1).
 
--type pin() :: non_neg_integer().
--type pin_direction() :: 'input' | 'output'.
--type pin_state() :: 0 | 1.
--type interrupt_condition() :: 'enabled' | 'summarize' | 'none' | 'rising' | 'falling' | 'both'.
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 -export_type([interrupt_condition/0]).
 
@@ -51,10 +50,19 @@
 %% @doc
 %% Starts a process to handle a GPIO.
 %% @end
+-spec start(term(), pin(), pin_direction()) ->
+                    {'ok', pid()} | 'ignore' | {'error', term()}.
+start(ServerName, Pin, Direction) ->
+  gen_server:start(ServerName, ?MODULE, {Pin, Direction}, []).
+
 -spec start_link(term(), pin(), pin_direction()) ->
                     {'ok', pid()} | 'ignore' | {'error', term()}.
 start_link(ServerName, Pin, Direction) ->
   gen_server:start_link(ServerName, ?MODULE, {Pin, Direction}, []).
+
+-spec(start(pin(), pin_direction()) -> {ok, pid()} | {error, reason}).
+start(Pin, Direction) ->
+  gen_server:start(?MODULE, {Pin, Direction}, []).
 
 -spec(start_link(pin(), pin_direction()) -> {ok, pid()} | {error, reason}).
 start_link(Pin, Direction) ->
@@ -164,6 +172,7 @@ handle_call({register_int, Pid}, _From,
     {reply, ok, State#state{pids=NewPids}};
 handle_call({unregister_int, Pid}, _From,
             #state{pids=Pids}=State) ->
+	unlink(Pid),
     NewPids = lists:delete(Pid, Pids),
     {reply, ok, State#state{pids=NewPids}}.
 
@@ -184,6 +193,11 @@ handle_cast(stop, State) ->
 handle_info({Port, {data, <<?NOTIFICATION, Msg/binary>>}},
             #state{port=Port, pids=Pids}=State) ->
     Notif = binary_to_term(Msg),
+%% 	error_logger:info_report(["@@@ Notification has been received from C driver.",
+%% 							  {port, Port},
+%% 							  {msg, {data, <<?NOTIFICATION, Msg/binary>>}},
+%% 							  {notification, Notif},
+%% 							  {pidList, Pids}]),
     [ Pid ! Notif || Pid <- Pids ],
     {noreply, State};
 handle_info({'EXIT', DeadPid, _Reason},     % a listener died
