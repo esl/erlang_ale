@@ -75,7 +75,7 @@ Here is the schematic about circuit:
 
 # ex_mcp23x17:start_spi_blinking_led/4
 
-This example shows how to blinking a LED connected to the a PIN of SPI IO expander device, when CS PIN of the IO expander is connect to NOT Raspberry Pi's SPI_CS PI, but connected to a PIN of an I2C IO expander device.
+This example shows how to blinking a LED connected to the a PIN of SPI IO expander device, when CS PIN of the IO expander is connect to NOT Raspberry Pi's SPI_CS PIN, but connected to a PIN of an I2C IO expander device.
 
 Here is the schematic about the circuit:
 
