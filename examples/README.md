@@ -29,7 +29,7 @@ A similar log information will be printed in the Erlang shell once an interrupt 
 		gpio: 27
 		interrupt_condition: falling
 
-# ex_mcp23x17
+# ex_mcp23x17:start_i2c_blinking_led/4
 
 This example module have few functions to introduce how to configure, control MCP23S17 and MCP23017 IO
 expander devices.
