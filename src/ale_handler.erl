@@ -65,6 +65,7 @@
 %% SPI related functions
 -export([
 		 %%spi_init/2,
+		 spi_stop/2,
 		 spi_transfer/3
 		]).
 
@@ -271,6 +272,24 @@ i2c_read(DeviceName, HWAddress, Len) ->
 
 %% ====================================================================
 %% @doc
+%% Stop SPI driver.
+%% @end
+-spec spi_stop(devname(), list()) -> ok | {error, term()}.
+%% ====================================================================
+spi_stop(DeviceName, SpiOptions) ->
+	%% Start ALE handler if not started yet.
+	start_link(),
+	
+	case catch gen_server:call(?SERVER, {spi_stop, DeviceName, SpiOptions}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		ok ->
+			ok;
+		ER->ER
+	end.
+
+%% ====================================================================
+%% @doc
 %% Transfer data into/from SPI device.
 %% @end
 -spec spi_transfer(devname(), list(), data()) -> {ok, data()} | {error, term()}.
@@ -450,6 +469,17 @@ handle_call({spi_transfer, DeviceName, SpiOptions, Data}, _From, State) ->
 					end;
 				{error, R} ->
 					{error, R}
+			end,
+	{reply, Reply, State};
+
+
+handle_call({spi_stop, DeviceName, SpiOptions}, _From, State) ->
+	Reply = case get_driver_process(?DRV_SPI_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, SpiOptions]) of
+				{ok, R} ->
+					stop_driver_process(R#rALEHandler.drvPid);
+					
+				ER->
+					ER
 			end,
 	{reply, Reply, State};
 	
