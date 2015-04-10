@@ -1,5 +1,8 @@
-%% @author ethrbh
-%% @doc @todo Add description to bit_operations.
+%% @author ethrbh, Robert Balogh, ethrbh@gmail.com
+%% @copyright (C) 2015, Robert Balogh
+%% @doc
+%% This module contains functions for bit manipulations.
+%% @end
 
 
 -module(bit_operations).

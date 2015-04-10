@@ -1,3 +1,8 @@
+%% @author ethrbh, Robert Balogh, ethrbh@gmail.com
+%% @copyright (C) 2015, Robert Balogh
+%% @doc
+%% @end
+
 -ifndef(ALE_TYPE_DEF_HRL).
 -define(ALE_TYPE_DEF_HRL,true).
 

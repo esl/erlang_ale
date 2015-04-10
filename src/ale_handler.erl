@@ -1,7 +1,7 @@
 %% @author ethrbh, Robert Balogh, ethrbh@gmail.com
 %% @copyright (C) 2015, Robert Balogh
 %% @doc
-%% This file contains functions for handle Erlang/ALE Gpio, I2C and SPI modules 
+%% This module contains functions for handle Erlang/ALE Gpio, I2C and SPI modules 
 %% through a handler what controls these modules. This control means if the started
 %% module had been started, for example a Gpio has been configured as input,
 %% the Erlang process what is assigned for handle this operation, will restart automatically

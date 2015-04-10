@@ -1,10 +1,8 @@
--ifndef(MCP23x17_HRL).
--define(MCP23x17_HRL,true).
-
-%% ====================================================================
+%% @author ethrbh, Robert Balogh, ethrbh@gmail.com
+%% @copyright (C) 2015, Robert Balogh
 %% @doc
 %% 
-%% This header file contains all definitions of MCP23x17 portexpander
+%% This header file contains all definitions of MCP23x17 port expander
 %% chip. This chip has two kind of variant on communication interface
 %% point of view.
 %% The MCP23017 has I2C interface, and the MCP23S17 works with SPI.
@@ -13,18 +11,31 @@
 %% 
 %% All these are ported from my old Pic MCU project, where I have been used
 %% these.
-%% 
 %% @end
-%% ====================================================================
+
+-ifndef(MCP23x17_HRL).
+-define(MCP23x17_HRL,true).
 
 %% ====================================================================
 %% Include
 %% ====================================================================
 -include("ale_type_def.hrl").
 
--type hw_addr()			::	integer().
+-type hw_addr()			::	integer().	%% The default HW address of MCP23x17 device is 16#20.
+										%% This means all external address pins (A2..A0) are connected GROUND (logical level 0).
+										%% Example for addressing:
+										%% 		B7 B6 B5 B4 B3 B2 B1 B0
+										%% 		0  1  x  x  A2 A1 A0 R/W
+										%% Good to know:
+										%%		This driver module will take care to compute value of R/W bit, thus HW address MUST be set
+										%%		as A0 bit is the B0, A1 is the B1, and so on.
+										%%		Example:
+										%%			If B7=0, B6=1, B5=B4=0, A2=1, A1=0, A0=1 => 2#0100101R/W the address value what must user
+										%%			as HwAddr is 2#00100101 == 16#25.
 -type reg_addr()		::	integer().
 -type reg_value()		::	integer(). 
+
+-type timer_in_msec()	::	integer().	%% Timer value in msec.
 
 %% ====================================================================
 %% Possible serial communication interfaces

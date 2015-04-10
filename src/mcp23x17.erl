@@ -1,5 +1,9 @@
-%% @author ethrbh
-%% @doc @todo Add description to mcp23x17drv.
+%% @author ethrbh, Robert Balogh, ethrbh@gmail.com
+%% @copyright (C) 2015, Robert Balogh
+%% @doc
+%% This module provides interface to able to control MCP23S17 and MCP23017
+%% IO expander devices.
+%% @end
 
 
 -module(mcp23x17).
@@ -39,9 +43,6 @@
 		 setup_input_polarity/5
 		]).
 
--export([set_hwaddr_for_read/1, set_hwaddr_for_write/1]).
-
--export([i2c_test_blinking_led/5, do_i2c_test_blinking_led/5]).
 -export([spi_test/1, spi_test_blinking_led/5, do_spi_test_blinking_led/5]).
 
 
@@ -506,34 +507,6 @@ setup_input_polarity(CommType, HwAddr, Port, Pin, IPol) ->
 							  end,
 			write(CommType, HwAddr, IPolRegAddr, NewIPolRegValue);
 		ER->ER
-	end.
-
-%% ====================================================================
-%% @doc
-%% Blinking a led connected to any Pin of I2C MCP23017 IO expander device.
-%% @end
-%% ====================================================================
-i2c_test_blinking_led(CommType, HwAddr, Port, Pin, Timer) ->
-	erlang:spawn(?MODULE, do_i2c_test_blinking_led, [CommType, HwAddr, Port, Pin, Timer]).
-
-do_i2c_test_blinking_led(CommType, HwAddr, Port, Pin, Timer) ->
-	%% Init timer
-	timer:send_interval(Timer, self(), {do_blinking}),
-	do_i2c_test_blinking_led_loop(CommType, HwAddr, Port, Pin, off).
-
-do_i2c_test_blinking_led_loop(CommType, HwAddr, Port, Pin, PinState) ->
-	receive
-		{do_blinking} ->
-			case PinState of
-				on ->
-					setup_io_logical_level(CommType,HwAddr,Port,Pin,0),
-					do_i2c_test_blinking_led_loop(CommType, HwAddr, Port, Pin, off);
-				off ->
-					setup_io_logical_level(CommType,HwAddr,Port,Pin,1),
-					do_i2c_test_blinking_led_loop(CommType, HwAddr, Port, Pin, on)
-			end;
-		_->
-			do_i2c_test_blinking_led_loop(CommType, HwAddr, Port, Pin, PinState)
 	end.
 
 %% ====================================================================

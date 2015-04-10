@@ -18,5 +18,8 @@ gpio_counter: compile
 
 ale_handler_gpio_int_test: compile
 	erl -pa ${ALE_EBIN_DIR} -pa . -run ale_handler_gpio_int_test start_link
+
+shell:
+	erl -pa ${ALE_EBIN_DIR} -pa .
 	
-.PHONY: all compile clean gpio_counter
+.PHONY: all compile clean shell gpio_counter
