@@ -51,11 +51,11 @@
 %% ====================================================================
 %% Possible port sides
 %% ====================================================================
--type mcp23x17_port_a()	::	0.
--type mcp23x17_port_b()	::	1.
+-type mcp23x17_port_a()	::	'A'.
+-type mcp23x17_port_b()	::	'B'.
 -type mcp23x17_port()	::	mcp23x17_port_a() | mcp23x17_port_b().
--define(MCP23X17_PORT_A, 0).
--define(MCP23X17_PORT_B, 1).
+-define(MCP23X17_PORT_A, 'A').
+-define(MCP23X17_PORT_B, 'B').
 
 %% ====================================================================
 %% Pins of port
