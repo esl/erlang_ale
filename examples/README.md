@@ -56,22 +56,29 @@ Here is the schematic about circuit:
 		
 		Start blinking LED:
 		-------------------
-			1> ex_mcp23x17:start_i2c_blinking_led(16#20, 'A', 0, 200).
-	
-			=INFO REPORT==== 10-Apr-2015::06:05:57 ===
-	    		"ALE driver process has been started and registered successfully."
-	    		drvModule: i2c
-	    		drvStartFunction: start
-	    		drvStartArgs: ["i2c-1",32]
-	    		drvPid: <0.39.0>
-	    		monitorRef: #Ref<0.0.0.36>
-			ok
+		3> ex_mcp23x17:start_i2c_blinking_led(16#20, 'A', 0, 200).
+		
+		=INFO REPORT==== 10-Apr-2015::12:21:46 ===
+		    "ALE driver process has been started and registered successfully."
+		    drvModule: i2c
+		    drvStartFunction: start
+		    drvStartArgs: ["i2c-1",32]
+		    drvPid: <0.44.0>
+		    monitorRef: #Ref<0.0.0.1550>
+		ok
 		
 		Stop blinking LED:
 		------------------
-			2> ex_mcp23x17:stop_i2c_blinking_led().
-			ok
-			3>
+		4> ex_mcp23x17:stop_i2c_blinking_led().
+		
+		=INFO REPORT==== 10-Apr-2015::12:21:57 ===
+		    "ALE driver has been released."
+		    drvPid: <0.44.0>
+		    record_in_ets: {rALEHandler,{i2c,"i2c-1",32},
+		                                {ale_handler,i2c_write,["i2c-1",32,<<0>>]},
+		                                <0.44.0>,#Ref<0.0.0.1550>}
+		ok
+		5>
 
 # ex_mcp23x17:start_spi_blinking_led/4
 
@@ -109,28 +116,43 @@ Here is the schematic about the circuit:
 		
 		Start blinking LED:
 		-------------------
-		2> ex_mcp23x17:start_spi_blinking_led(32, 'A', 0, 200).
+		1> ex_mcp23x17:start_spi_blinking_led(32, 'A', 0, 200).
 		
-		=INFO REPORT==== 10-Apr-2015::11:19:01 ===
+		=INFO REPORT==== 10-Apr-2015::12:20:06 ===
 		    "ALE driver process has been started and registered successfully."
 		    drvModule: i2c
 		    drvStartFunction: start
 		    drvStartArgs: ["i2c-1",32]
-		    drvPid: <0.41.0>
-		    monitorRef: #Ref<0.0.0.41>
+		    drvPid: <0.38.0>
+		    monitorRef: #Ref<0.0.0.35>
 		
-		=INFO REPORT==== 10-Apr-2015::11:19:01 ===
+		=INFO REPORT==== 10-Apr-2015::12:20:06 ===
 		    "ALE driver process has been started and registered successfully."
 		    drvModule: spi
 		    drvStartFunction: start
 		    drvStartArgs: ["spidev0.0",[]]
-		    drvPid: <0.42.0>
-		    monitorRef: #Ref<0.0.0.57>
+		    drvPid: <0.39.0>
+		    monitorRef: #Ref<0.0.0.51>
 		ok
 		
 		Stop blinking LED:
 		-------------------
-		3> ex_mcp23x17:stop_spi_blinking_led().
+		2> ex_mcp23x17:stop_spi_blinking_led().
+		
+		=INFO REPORT==== 10-Apr-2015::12:20:15 ===
+		    "ALE driver has been released."
+		    drvPid: <0.39.0>
+		    record_in_ets: {rALEHandler,
+		                       {spi,"spidev0.0",[]},
+		                       {ale_handler,spi_transfer,["spidev0.0",[],<<65,0,0>>]},
+		                       <0.39.0>,#Ref<0.0.0.51>}
+		
+		=INFO REPORT==== 10-Apr-2015::12:20:15 ===
+		    "ALE driver has been released."
+		    drvPid: <0.38.0>
+		    record_in_ets: {rALEHandler,{i2c,"i2c-1",32},
+		                                {ale_handler,i2c_write,["i2c-1",32,<<0>>]},
+		                                <0.38.0>,#Ref<0.0.0.35>}
 		ok
-		4>
+		3>
 

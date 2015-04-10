@@ -33,6 +33,11 @@
 %% Behavioural functions 
 %% ====================================================================
 -record(state, {
+				commType,
+				hwAddr,
+				port,
+				pin,
+				timer,
 				tref,
 				pinstate
 				}).
@@ -120,9 +125,15 @@ init([{i2c_blinking_led, HwAddr, Port, Pin, Timer}]) ->
 	mcp23x17:setup_io_logical_level(CommType, HwAddr, Port, Pin, ?MCP23X17_IO_LOGICAL_LOW),
 	
 	%% Start timerfor blinking the led conencted to the Pin.
-	case timer:send_interval(Timer, self(), {do_blinking, i2c_blinking_led, CommType, HwAddr, Port, Pin}) of
+	case timer:send_interval(Timer, self(), {do_blinking, i2c_blinking_led}) of
 		{ok, TRef} ->
-    		{ok, #state{tref = TRef, pinstate = ?MCP23X17_IO_LOGICAL_LOW}};
+    		{ok, #state{
+						commType = CommType,
+						hwAddr = HwAddr,
+						port = Port,
+						pin = Pin,
+						tref = TRef, 
+						pinstate = ?MCP23X17_IO_LOGICAL_LOW}};
 		ER->{stop, ER}
 	end;
 init([{spi_blinking_led, HwAddr, Port, Pin, Timer}]) ->
@@ -141,9 +152,15 @@ init([{spi_blinking_led, HwAddr, Port, Pin, Timer}]) ->
 	mcp23x17:setup_io_logical_level(CommType, HwAddr, Port, Pin, ?MCP23X17_IO_LOGICAL_LOW),
 	
 	%% Start timerfor blinking the led conencted to the Pin.
-	case timer:send_interval(Timer, self(), {do_blinking, spi_blinking_led, CommType, HwAddr, Port, Pin}) of
+	case timer:send_interval(Timer, self(), {do_blinking, spi_blinking_led}) of
 		{ok, TRef} ->
-    		{ok, #state{tref = TRef, pinstate = ?MCP23X17_IO_LOGICAL_LOW}};
+    		{ok, #state{
+						commType = CommType,
+						hwAddr = HwAddr,
+						port = Port,
+						pin = Pin,
+						tref = TRef,
+						pinstate = ?MCP23X17_IO_LOGICAL_LOW}};
 		ER->{stop, ER}
 	end;
 init([]) ->
@@ -167,7 +184,36 @@ init([]) ->
 	Reason :: term().
 %% ====================================================================
 handle_call({stop}, _From, State) ->
+	%% Cancel timer
 	timer:cancel(State#state.tref),
+	
+	%% Turn LED OFF
+	mcp23x17:setup_io_logical_level(State#state.commType, State#state.hwAddr, State#state.port, State#state.pin, ?MCP23X17_IO_LOGICAL_LOW),
+	
+	%% Stop related ALE driver(s)
+	case State#state.commType of
+		?MCP23X17_COMM_TYPE_I2C1 ->
+			mcp23x17:i2c_driver_stop(State#state.commType, State#state.hwAddr);
+		?MCP23X17_COMM_TYPE_SPI0 ->
+			mcp23x17:spi_driver_stop(State#state.commType);
+		{?MCP23X17_COMM_TYPE_SPI0, Select_SPI_Slave_MFA, Unselect_SPI_Slave_MFA} ->
+			%% Stop SPI driver
+			mcp23x17:spi_driver_stop(?MCP23X17_COMM_TYPE_SPI0),
+			
+			%% Stop drivers of SPI CS functionality
+			{_,_,[CommType_1,CS_HW_ADDR_1,_,_,_]} = Select_SPI_Slave_MFA,
+			{_,_,[CommType_2,CS_HW_ADDR_2,_,_,_]} = Unselect_SPI_Slave_MFA,
+			
+			[begin 
+				 case CommType_T of
+					 ?MCP23X17_COMM_TYPE_I2C1 ->
+						 mcp23x17:i2c_driver_stop(CommType_T, CS_HW_ADDR_T);
+					 ?MCP23X17_COMM_TYPE_SPI0 ->
+						 mcp23x17:spi_driver_stop(CommType_T)
+				 end
+			end || [CommType_T, CS_HW_ADDR_T] <- lists:usort([[CommType_1,CS_HW_ADDR_1],[CommType_2,CS_HW_ADDR_2]])]
+	end,
+	
 	{stop, normal, ok, State};
 
 handle_call(_Request, _From, State) ->
@@ -201,24 +247,24 @@ handle_cast(_Msg, State) ->
 	NewState :: term(),
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
-handle_info({do_blinking, i2c_blinking_led, CommType, HwAddr, Port, Pin}, State) ->
+handle_info({do_blinking, i2c_blinking_led}, State) ->
 	NewPinState = case State#state.pinstate of
 					  ?MCP23X17_IO_LOGICAL_LOW ->
 						  %% Turn Led ON
 						  ?MCP23X17_IO_LOGICAL_HIGH;
 					  _-> ?MCP23X17_IO_LOGICAL_LOW
 				end,
-	mcp23x17:setup_io_logical_level(CommType,HwAddr,Port,Pin,NewPinState),
+	mcp23x17:setup_io_logical_level(State#state.commType, State#state.hwAddr, State#state.port, State#state.pin, NewPinState),
 	{noreply, State#state{pinstate = NewPinState}};
 
-handle_info({do_blinking, spi_blinking_led, CommType, HwAddr, Port, Pin}, State) ->
+handle_info({do_blinking, spi_blinking_led}, State) ->
 	NewPinState = case State#state.pinstate of
 					  ?MCP23X17_IO_LOGICAL_LOW ->
 						  %% Turn Led ON
 						  ?MCP23X17_IO_LOGICAL_HIGH;
 					  _-> ?MCP23X17_IO_LOGICAL_LOW
 				end,
-	mcp23x17:setup_io_logical_level(CommType,HwAddr,Port,Pin,NewPinState),
+	mcp23x17:setup_io_logical_level(State#state.commType, State#state.hwAddr, State#state.port, State#state.pin,NewPinState),
 	{noreply, State#state{pinstate = NewPinState}};
 
 handle_info(_Info, State) ->

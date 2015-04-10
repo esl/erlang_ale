@@ -43,7 +43,7 @@
 		 setup_input_polarity/5
 		]).
 
--export([spi_test/1, spi_test_blinking_led/5, do_spi_test_blinking_led/5]).
+-export([i2c_driver_stop/2, spi_driver_stop/1]).
 
 
 
@@ -510,45 +510,6 @@ setup_input_polarity(CommType, HwAddr, Port, Pin, IPol) ->
 	end.
 
 %% ====================================================================
-%% Test SPI
-%% ====================================================================
-spi_test(LogicLevel) ->
-	SPI_HW_ADDR = 32,
-	MFA_Select_SPI_Slave = {?MODULE, setup_io_logical_level, [?MCP23X17_COMM_TYPE_I2C1,SPI_HW_ADDR,?MCP23X17_PORT_A,1,0]},
-	MFA_Unselect_SPI_Slave = {?MODULE, setup_io_logical_level, [?MCP23X17_COMM_TYPE_I2C1,SPI_HW_ADDR,?MCP23X17_PORT_A,1,1]},
-	
-	%% Set IO level of SPI device
-	setup_io_logical_level({?MCP23X17_COMM_TYPE_SPI0, MFA_Select_SPI_Slave, MFA_Unselect_SPI_Slave},SPI_HW_ADDR,?MCP23X17_PORT_A,0,LogicLevel).
-	
-spi_test_blinking_led(CommType, HwAddr, Port, Pin, Timer) ->
-	erlang:spawn(?MODULE, do_spi_test_blinking_led, [CommType, HwAddr, Port, Pin, Timer]).
-
-do_spi_test_blinking_led(CommType, HwAddr, Port, Pin, Timer) ->
-	%% Init timer
-	timer:send_interval(Timer, self(), {do_blinking}),
-	do_spi_test_blinking_led_loop(CommType, HwAddr, Port, Pin, off).
-
-do_spi_test_blinking_led_loop(CommType, HwAddr, Port, Pin, PinState) ->
-	I2C_HW_ADDR = 32,
-	SPI_CS_PIN_ON_I2C_DEV = 1,
-	MFA_Select_SPI_Slave = {?MODULE, setup_io_logical_level, [?MCP23X17_COMM_TYPE_I2C1,I2C_HW_ADDR,?MCP23X17_PORT_A,SPI_CS_PIN_ON_I2C_DEV,0]},
-	MFA_Unselect_SPI_Slave = {?MODULE, setup_io_logical_level, [?MCP23X17_COMM_TYPE_I2C1,I2C_HW_ADDR,?MCP23X17_PORT_A,SPI_CS_PIN_ON_I2C_DEV,1]},
-	
-	receive
-		{do_blinking} ->
-			case PinState of
-				on ->
-					setup_io_logical_level({CommType, MFA_Select_SPI_Slave, MFA_Unselect_SPI_Slave},HwAddr,Port,Pin,0),
-					do_spi_test_blinking_led_loop(CommType, HwAddr, Port, Pin, off);
-				off ->
-					setup_io_logical_level({CommType, MFA_Select_SPI_Slave, MFA_Unselect_SPI_Slave},HwAddr,Port,Pin,1),
-					do_spi_test_blinking_led_loop(CommType, HwAddr, Port, Pin, on)
-			end;
-		_->
-			do_spi_test_blinking_led_loop(CommType, HwAddr, Port, Pin, PinState)
-	end.
-
-%% ====================================================================
 %% Give the record (rMCP23x17_PORT_PIN) of PIN.
 %% Input:
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
@@ -584,6 +545,24 @@ pin_rec_set(Rec) when is_record(Rec, rMCP23x17_PORT_PIN)->
 			ok;
 		ER->ER
 	end.
+
+%% ====================================================================
+%% @doc
+%% Stop I2C driver.
+%% @end
+-spec i2c_driver_stop(mcp23x17_comm_type(), hw_addr()) -> ok | {error, term()}.
+%% ====================================================================
+i2c_driver_stop(CommType, HwAddr) ->
+	ale_handler:i2c_stop(get_comm_devicename(CommType), HwAddr).
+
+%% ====================================================================
+%% @doc
+%% Stop SPI driver.
+%% @end
+-spec spi_driver_stop(mcp23x17_comm_type()) -> ok | {error, term()}.
+%% ====================================================================
+spi_driver_stop(CommType) ->
+	ale_handler:spi_stop(get_comm_devicename(CommType), ?SPI_DEVICE_DEFAULT_OPTIONS).
 
 %% ====================================================================
 %% @doc <a href="http://www.erlang.org/doc/man/gen_server.html#Module:init-1">gen_server:init/1</a>
