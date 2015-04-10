@@ -44,7 +44,9 @@
 %% ====================================================================
 -type mcp23x17_comm_type_spi0()	::	spi0.
 -type mcp23x17_comm_type_i2c1()	::	i2c1.
--type mcp23x17_comm_type()		::	mcp23x17_comm_type_spi0() | mcp23x17_comm_type_i2c1().
+-type select_spi_dev_mfa()		::	mfa().
+-type unselect_spi_dev_mfa()	::	mfa().
+-type mcp23x17_comm_type()		::	mcp23x17_comm_type_spi0() | {mcp23x17_comm_type_spi0(), select_spi_dev_mfa(), unselect_spi_dev_mfa()} | mcp23x17_comm_type_i2c1().
 -define(MCP23X17_COMM_TYPE_SPI0,  spi0).
 -define(MCP23X17_COMM_TYPE_I2C1,  i2c1).
 

@@ -24,9 +24,8 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([
-		 start_i2c_blinking_led/4, stop_i2c_blinking_led/0
-		 ]).
+-export([start_i2c_blinking_led/4, stop_i2c_blinking_led/0]).
+-export([start_spi_blinking_led/4, stop_spi_blinking_led/0]).
 
 
 
@@ -42,7 +41,7 @@
 %% @doc
 %% Blinking a led connected to any Pin of MCP23017 (I2C) IO expander device.
 %% Notes:
-%%		- In this example i2c-1 device on Raspberry Pi has been used.
+%%		In this example i2c-1 device on Raspberry Pi has been used.
 %% 
 %% @end
 -spec start_i2c_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin(), timer_in_msec()) -> ok | {error, term()}.
@@ -68,6 +67,40 @@ stop_i2c_blinking_led() ->
 		_->	ok
 	end.
 
+%% ====================================================================
+%% @doc
+%% Blinking a led connected to any Pin of MCP23S17 (SPI) IO expander device.
+%% Notes:
+%%		In this example spidev0.0 device on Raspberry Pi has been used,
+%%		but NOT SPI_CS pin on Pi has been used for select/unselect SPI
+%%		device. The PIN1 on MCP23017 (I2C !!!) devic is connected to
+%%		PIN11 on MCP23S17 device, and the I2C IO expander will play the "CS"
+%%		function. This is a feature of mcp23x17.erl driver implementation.
+%% 
+%% @end
+-spec start_spi_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin(), timer_in_msec()) -> ok | {error, term()}.
+%% ====================================================================
+start_spi_blinking_led(HwAddr, Port, Pin, Timer) ->
+	case gen_server:start({local, spi_blinking_led}, ?MODULE, [{spi_blinking_led, HwAddr, Port, Pin, Timer}], [{timeout, ?TIMEOUT_FOR_OPERATION}]) of
+		{ok, _Pid} ->
+			ok;
+		{error,R} ->
+			{error,R}
+	end.
+
+%% ====================================================================
+%% @doc
+%% Stop blinking Led on SPI device.
+%% @end
+-spec stop_spi_blinking_led() -> ok.
+%% ====================================================================
+stop_spi_blinking_led() ->
+	case whereis(spi_blinking_led) of
+		P when is_pid(P) ->
+			gen_server:call(spi_blinking_led, {stop}, ?TIMEOUT_FOR_OPERATION);
+		_->	ok
+	end.
+
 %% init/1
 %% ====================================================================
 %% @doc <a href="http://www.erlang.org/doc/man/gen_server.html#Module:init-1">gen_server:init/1</a>
@@ -81,11 +114,34 @@ stop_i2c_blinking_led() ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 init([{i2c_blinking_led, HwAddr, Port, Pin, Timer}]) ->
+	CommType = ?MCP23X17_COMM_TYPE_I2C1,
+	
 	%% Set logical value 0 to Pin.
-	mcp23x17:setup_io_logical_level(?MCP23X17_COMM_TYPE_I2C1, HwAddr, Port, Pin, ?MCP23X17_IO_LOGICAL_LOW),
+	mcp23x17:setup_io_logical_level(CommType, HwAddr, Port, Pin, ?MCP23X17_IO_LOGICAL_LOW),
 	
 	%% Start timerfor blinking the led conencted to the Pin.
-	case timer:send_interval(Timer, self(), {do_blinking, i2c_blinking_led, ?MCP23X17_COMM_TYPE_I2C1, HwAddr, Port, Pin}) of
+	case timer:send_interval(Timer, self(), {do_blinking, i2c_blinking_led, CommType, HwAddr, Port, Pin}) of
+		{ok, TRef} ->
+    		{ok, #state{tref = TRef, pinstate = ?MCP23X17_IO_LOGICAL_LOW}};
+		ER->{stop, ER}
+	end;
+init([{spi_blinking_led, HwAddr, Port, Pin, Timer}]) ->
+	%% Below parameters are for CS function for SPI device, when NOT CS pin on Pi hw is used.
+	CommTypeI2C = ?MCP23X17_COMM_TYPE_I2C1,
+	CS_HW_ADDR = 32,
+	CS_PIN = 1,
+	
+	Select_SPI_Slave_MFA = {mcp23x17, setup_io_logical_level, [CommTypeI2C,CS_HW_ADDR,?MCP23X17_PORT_A,CS_PIN,?MCP23X17_IO_LOGICAL_LOW]},
+	Unselect_SPI_Slave_MFA = {mcp23x17, setup_io_logical_level, [CommTypeI2C,CS_HW_ADDR,?MCP23X17_PORT_A,CS_PIN,?MCP23X17_IO_LOGICAL_HIGH]},
+	
+	CommType = {?MCP23X17_COMM_TYPE_SPI0, Select_SPI_Slave_MFA, Unselect_SPI_Slave_MFA},
+	%% End of CS parameters
+	
+	%% Set logical value 0 to Pin on SPI device.
+	mcp23x17:setup_io_logical_level(CommType, HwAddr, Port, Pin, ?MCP23X17_IO_LOGICAL_LOW),
+	
+	%% Start timerfor blinking the led conencted to the Pin.
+	case timer:send_interval(Timer, self(), {do_blinking, spi_blinking_led, CommType, HwAddr, Port, Pin}) of
 		{ok, TRef} ->
     		{ok, #state{tref = TRef, pinstate = ?MCP23X17_IO_LOGICAL_LOW}};
 		ER->{stop, ER}
@@ -154,7 +210,17 @@ handle_info({do_blinking, i2c_blinking_led, CommType, HwAddr, Port, Pin}, State)
 				end,
 	mcp23x17:setup_io_logical_level(CommType,HwAddr,Port,Pin,NewPinState),
 	{noreply, State#state{pinstate = NewPinState}};
-	
+
+handle_info({do_blinking, spi_blinking_led, CommType, HwAddr, Port, Pin}, State) ->
+	NewPinState = case State#state.pinstate of
+					  ?MCP23X17_IO_LOGICAL_LOW ->
+						  %% Turn Led ON
+						  ?MCP23X17_IO_LOGICAL_HIGH;
+					  _-> ?MCP23X17_IO_LOGICAL_LOW
+				end,
+	mcp23x17:setup_io_logical_level(CommType,HwAddr,Port,Pin,NewPinState),
+	{noreply, State#state{pinstate = NewPinState}};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 

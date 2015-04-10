@@ -31,25 +31,23 @@ A similar log information will be printed in the Erlang shell once an interrupt 
 
 # ex_mcp23x17:start_i2c_blinking_led/4
 
-This example module have few functions to introduce how to configure, control MCP23S17 and MCP23017 IO
-expander devices.
-	
-	Blinking a Led connected to MCP23017 (I2C) IO expander:
-		Before try out this example, the following preparation needs to be done:
-			-  Connect MCP23017 IO expander Pins:
-				PIN9  - VDD
-				PIN10 - VSS
-				PIN12 - I2C-SCL -> Raspberry Pi PIN5
-				PIN13 - I2C-SDA -> Raspberry Pi PIN3
-				PIN15 - VSS
-				PIN16 - VSS
-				PIN17 - VSS
-				PIN18 - VDD
-				PIN21 - LED with 470ohm serial resistor -> VSS
-				
+This example shows how to blinking a LED connected to the a PIN of I2C IO expander device.
+
 Here is the schematic about circuit:
 
 ![I2C LED BLINKING schematic](../doc/images/schematic-ex_start_i2c_blinking_led.png)
+
+	Before try out this example, the following preparation needs to be done on the IO expander device:
+	-  Connect MCP23017 IO expander Pins:
+		PIN9  - VDD
+		PIN10 - VSS
+		PIN12 - I2C-SCL -> Raspberry Pi PIN5
+		PIN13 - I2C-SDA -> Raspberry Pi PIN3
+		PIN15 - VSS
+		PIN16 - VSS
+		PIN17 - VSS
+		PIN18 - VDD
+		PIN21 - LED with 470ohm serial resistor -> VSS
 		
 		HwAddr	: 16#20, because all Ax PINs are connected to VSS (Ground)
 		Port	: IO expander device has 2 Ports, 'A' and 'B'. In this example we are using Port 'A'.
@@ -74,4 +72,65 @@ Here is the schematic about circuit:
 			2> ex_mcp23x17:stop_i2c_blinking_led().
 			ok
 			3>
+
+# ex_mcp23x17:start_spi_blinking_led/4
+
+This example shows how to blinking a LED connected to the a PIN of SPI IO expander device, when CS PIN of the IO expander is connect to NOT Raspberry Pi's SPI_CS PI, but connected to a PIN of an I2C IO expander device.
+
+Here is the schematic about the circuit:
+
+![SPI LED BLINKING schematic](../doc/images/schematic-ex_start_spi_blinking_led.png)
+
+	Before try out this example, the following preparation needs to be done on the IO expander devices:
+	
+	-  Connect MCP23017 (I2C) IO expander Pins:
+		PIN9  - VDD
+		PIN10 - VSS
+		PIN12 - I2C-SCL -> Raspberry Pi PIN5
+		PIN13 - I2C-SDA -> Raspberry Pi PIN3
+		PIN15 - VSS
+		PIN16 - VSS
+		PIN17 - VSS
+		PIN18 - VDD
+		PIN22 - PIN11 on SPI IO expander
 		
+	- Connect MCP23S17 (SPI) IO expander Pins:
+		PIN9  - VDD
+		PIN10 - VSS
+		PIN11 - SPI_CS  -> PIN22 on I2C IO expander
+		PIN12 - SPI-SCL -> Raspberry Pi PIN23
+		PIN13 - SPI-SI  -> Raspberry Pi PIN19 (SPI_MOSI)
+		PIN14 - SPI-SO  -> Raspberry Pi PIN21 (SPI_MISO)
+		PIN15 - VSS
+		PIN16 - VSS
+		PIN17 - VSS
+		PIN18 - VDD
+		PIN21 - LED with 470ohm serial resistor -> VSS
+		
+		Start blinking LED:
+		-------------------
+		2> ex_mcp23x17:start_spi_blinking_led(32, 'A', 0, 200).
+		
+		=INFO REPORT==== 10-Apr-2015::11:19:01 ===
+		    "ALE driver process has been started and registered successfully."
+		    drvModule: i2c
+		    drvStartFunction: start
+		    drvStartArgs: ["i2c-1",32]
+		    drvPid: <0.41.0>
+		    monitorRef: #Ref<0.0.0.41>
+		
+		=INFO REPORT==== 10-Apr-2015::11:19:01 ===
+		    "ALE driver process has been started and registered successfully."
+		    drvModule: spi
+		    drvStartFunction: start
+		    drvStartArgs: ["spidev0.0",[]]
+		    drvPid: <0.42.0>
+		    monitorRef: #Ref<0.0.0.57>
+		ok
+		
+		Stop blinking LED:
+		-------------------
+		3> ex_mcp23x17:stop_spi_blinking_led().
+		ok
+		4>
+
