@@ -734,7 +734,7 @@ handle_info({pwr_status_check}, State) ->
 					%% This means the power status has been changed from "not lost" to "lost".
 					%% Do send notification about it.
 					[begin
-						 Pid ! ?NOTIFICATION_PWR_IS_LOST 
+						 Pid ! {?NOTIFICATION_PWR_IS_LOST} 
 					 end || Pid <- State#state.pwrStatusNotificationPidList],
 					
 					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
@@ -749,7 +749,7 @@ handle_info({pwr_status_check}, State) ->
 					
 					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}}
 			end;
-				
+		
 		{error, _ER} ->
 			%% Faild to read PWR status.
 			%% I guess the whole RTC module is not available due to power failure.
@@ -760,7 +760,7 @@ handle_info({pwr_status_check}, State) ->
 				
 				_->	%% Send notification about power failure.
 					[begin
-						 Pid ! ?NOTIFICATION_PWR_IS_LOST 
+						 Pid ! {?NOTIFICATION_PWR_IS_LOST} 
 					 end || Pid <- State#state.pwrStatusNotificationPidList],
 					
 					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
