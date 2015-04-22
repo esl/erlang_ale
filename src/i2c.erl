@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, start_link/3, stop/1]).
+-export([start/2, start/3, start_link/2, start_link/3, stop/1]).
 -export([write/2, read/2, write_read/3]).
 
 %% gen_server callbacks
@@ -20,11 +20,10 @@
 
 -define(SERVER, ?MODULE).
 
--type addr() :: integer(). %% fix to be 2-127
--type data() :: binary().
--type len() :: integer().
--type devname() :: string().
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 %%%===================================================================
 %%% API
@@ -34,6 +33,14 @@
 %% Starts the process with the channel name and Initialize the devname device.
 %% You can identify the device by a channel name. Each channel drive a devname device.
 %% @end
+-spec(start(tuple(), devname(), addr()) -> {ok, pid()} | {error, reason}).
+start(ServerName, Devname, Address) ->
+    gen_server:start(ServerName, ?MODULE, {Devname, Address}, []).
+
+-spec(start(devname(), addr()) -> {ok, pid()} | {error, reason}).
+start(Devname, Address) ->
+    gen_server:start(?MODULE, {Devname, Address}, []).
+
 -spec(start_link(tuple(), devname(), addr()) -> {ok, pid()} | {error, reason}).
 start_link(ServerName, Devname, Address) ->
     gen_server:start_link(ServerName, ?MODULE, {Devname, Address}, []).
