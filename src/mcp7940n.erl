@@ -22,10 +22,8 @@
 -define(SERVER, ?MODULE).
 -define(TIMEOUT, 1000).
 -define(DO_RW_RTC_DEVICE, false).	%% This is only for test purpose.
--define(MCP7940n_NOTIFICATION_TABLE, mcp7940n_notification_table).
--define(MCP7940n_NOTIFICATION_TABLE_KEYPOS, 2).
 -define(DO_ERR(TEXT,TUPPLELIST), error_logger:error_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
-
+-define(DO_INFO(TEXT,TUPPLELIST), error_logger:info_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
 
 %% ====================================================================
 %% API functions
@@ -37,6 +35,10 @@
 -export([
 		 test_alarm_interrupt/0]).
 
+%% ====================================================================
+%% PWR checking and notification related functions
+%% ====================================================================
+-export([pwr_status_change_subscribe/0, pwr_status_change_subscribe/1, pwr_status_change_unsubscribe/1]).
 
 %% ====================================================================
 %% Control register setting
@@ -167,7 +169,19 @@
 
 -export([hour_convert_to_12h_format/1, hour_convert_to_24h_format/2]).
 
--record(state, {}).
+-define(PWR_STATUS_CHECK_INTERVAL,	1000).	%% Time interval in [msec], for check PWR status.
+-record(state, {
+				pwrStatusNotificationPidList = [],	%% List of pids, who has been ordered for notifications.
+				pwrStatusCheckIntervalTref,			%% Timer reference for the timer to trigger PWR checking periodicaly.
+				pwrStatusLastCheckTime,				%% The time of last checking time of PWR status. It is erlang:now().
+				pwrStatus							%% rtc_pwrfail()
+				}).
+
+%% ====================================================================
+%% Notifications
+%% ====================================================================
+-define(NOTIFICATION_PWR_IS_BACK, main_power_is_back).
+-define(NOTIFICATION_PWR_IS_LOST, main_power_is_lost).
 
 %% ====================================================================
 %% @doc
@@ -214,6 +228,38 @@ test_alarm_interrupt() ->
 	{ok, {{Y,M,D},{H,Min,S}}} = date_and_time_get(),
 	
 	alarm_configure(?RTC_ALARM_0_ID, {{Y,M,D},{H,Min+1,S}}, ?RTC_ALMxWKDAY_BIT_ALMxMASK_ALL_MATCH, ?RTC_CTRL_BIT_ALM_Ax_EN, ?RTC_ALMxWKDAY_BIT_ALMPOL_HIGH).
+
+%% ====================================================================
+%% PWR checking and notification related functions
+%% ====================================================================
+
+%% ====================================================================
+%% @doc
+%% Subscribe to PWR DOWN/UP events.
+%% @end
+-spec pwr_status_change_subscribe() -> ok | {error, term()}.
+%% ====================================================================
+pwr_status_change_subscribe() ->
+	pwr_status_change_subscribe(self()).
+
+%% ====================================================================
+%% @doc
+%% Subscribe to PWR DOWN/UP events.
+%% @end
+-spec pwr_status_change_subscribe(pid()) -> ok | {error, term()}.
+%% ====================================================================
+pwr_status_change_subscribe(PidToSendNotification) ->
+	do_gen_server_call({pwr_status_change_subscribe, PidToSendNotification}).
+
+%% ====================================================================
+%% @doc
+%% Unsubscribe to PWR DOWN/UP events.
+%% @end
+-spec pwr_status_change_unsubscribe(pid()) -> ok | {error, term()}.
+%% ====================================================================
+pwr_status_change_unsubscribe(PidToSendNotification) ->
+	do_gen_server_call({pwr_status_change_unsubscribe, PidToSendNotification}).
+
 
 %% ====================================================================
 %% @doc
@@ -447,14 +493,12 @@ write_sram(SramAddr, Data) ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 init([TimeFormat, Vbaten]) ->
-	ets:new(?MCP7940n_NOTIFICATION_TABLE, [ordered_set,public,named_table,{keypos,?MCP7940n_NOTIFICATION_TABLE_KEYPOS}]),
-	
 	case do_vbaten_read() of
 		{ok, ?RTC_WKDAY_BIT_VBATEN_EN} ->
 			%% Read PWRFAIL bit and decide full DATE and TIME configuration is needed or not.
 			case do_pwrfail_read() of
 				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST ->
-					error_logger:info_report(["Power failure status", {pwrfail, {?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST, "Primary power was lost"}}]),
+					?DO_INFO("Power failure status", [{pwrfail, {?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST, "Primary power was lost"}}]),
 					
 					%% Clear PWRFAIL bit
 					do_pwrfail_clear(),
@@ -501,8 +545,11 @@ init([TimeFormat, Vbaten]) ->
 			%% Start RTC oscillator
 			do_oscillator_start(),
 			
-			error_logger:info_report(["RTC has been started"]),
-			{ok, #state{}};
+			{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+			
+			?DO_INFO("RTC has been started", []),
+			
+			{ok, #state{pwrStatusCheckIntervalTref = TRef}};
 		
 		{ok, ?RTC_WKDAY_BIT_VBATEN_DIS} ->
 			%% Configure the current Date and Time anyway.
@@ -548,8 +595,10 @@ init([TimeFormat, Vbaten]) ->
 			%% Start RTC oscillator
 			do_oscillator_start(),
 			
-			error_logger:info_report(["RTC has been started"]),
-			{ok, #state{}};
+			{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+			
+			?DO_INFO("RTC has been started", []),
+			{ok, #state{pwrStatusCheckIntervalTref = TRef}};
 		
 		ER ->
 			?DO_ERR("Faild to do_init RTC device.", [{reason, ER}]),
@@ -576,6 +625,36 @@ init([TimeFormat, Vbaten]) ->
 handle_call({execute_mfa, {M,F,A}}, _From, State)->
 	{reply, erlang:apply(M, F, A), State};
 
+handle_call({pwr_status_change_subscribe, PidToSendNotification}, _From, State) ->
+	%% Check that PidToSendNotification is in the list or not.
+	case lists:member(PidToSendNotification, State#state.pwrStatusNotificationPidList) of
+		true ->
+			%% Pid is already subscribed to the PWR change notification.
+			?DO_ERR("Pid is already subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
+			{reply, {error, {pid_already_subscribed_to_pwr_change_notification, PidToSendNotification}}, State};
+		false ->
+			%% Insert Pid into the list
+			?DO_INFO("Pid has been subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
+			{reply, ok, State#state {pwrStatusNotificationPidList = lists:append(State#state.pwrStatusNotificationPidList, [PidToSendNotification])}}
+	end;
+
+handle_call({pwr_status_change_unsubscribe, PidToSendNotification}, _From, State) ->
+	case lists:member(PidToSendNotification, State#state.pwrStatusNotificationPidList) of
+		true ->
+			?DO_INFO("Pid has been unsubscribed to the PWR change notification", [{pid, PidToSendNotification}]),
+			{reply, ok, State#state {pwrStatusNotificationPidList = lists:delete(PidToSendNotification, State#state.pwrStatusNotificationPidList)}};
+		false ->
+			?DO_ERR("Pid does not subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
+			{reply, {error, {pid_does_not_subscribed_to_pwr_change_notification, PidToSendNotification}}, State}
+	end;
+
+handle_call({stop}, _From, State) ->
+	%% Stop timer
+	timer:cancel(State#state.pwrStatusCheckIntervalTref),
+	
+	%% Stop gen_server
+	{stop, normal, ok, State#state{pwrStatusCheckIntervalTref = undefined}};
+	
 handle_call(_Request, _From, State) ->
 	Reply = ok,
 	{reply, Reply, State}.
@@ -606,6 +685,90 @@ handle_cast(_Msg, State) ->
 	NewState :: term(),
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
+handle_info({pwr_status_check}, State) ->
+	%% Check status of PWR.
+	case do_pwrfail_read() of
+		{ok, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST} ->
+			%% Currently the power is not lost.
+			
+			case State#state.pwrStatus of
+				undefined ->
+					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
+										   pwrStatusLastCheckTime = erlang:now()},
+					{noreply, NewState};
+				
+				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST ->
+					%% Power status has not been changed since the last time when it was checked.
+					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}};
+				
+				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST ->
+					%% Last known power status is: lost
+					%% This means the power status has been changed from "lost" to "not lost".
+					%% Do send notification about it.
+					%% Read Power Down/Up TimeStamps and send these togather with ordinarz notification.
+					
+					PwrDownTS = do_pwr_down_date_and_time_get(),
+					PwrUpTS = do_pwr_up_date_and_time_get(),
+					
+					[begin
+						 Pid ! {?NOTIFICATION_PWR_IS_BACK, PwrDownTS, PwrUpTS} 
+					 end || Pid <- State#state.pwrStatusNotificationPidList],
+					
+					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST,
+										   pwrStatusLastCheckTime = erlang:now()},
+					{noreply, NewState}
+			end;
+			
+		{ok, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST} ->
+			%% Currently the PWRFAIL bit status is lost, but the power should returns back because I could read the device,
+			%% thus, PWRFAIL bit should be cleared.
+			
+			case State#state.pwrStatus of
+				undefined ->
+					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
+										   pwrStatusLastCheckTime = erlang:now()},
+					{noreply, NewState};
+
+				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST ->
+					%% Last known power status is: not lost
+					%% This means the power status has been changed from "not lost" to "lost".
+					%% Do send notification about it.
+					[begin
+						 Pid ! ?NOTIFICATION_PWR_IS_LOST 
+					 end || Pid <- State#state.pwrStatusNotificationPidList],
+					
+					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
+										   pwrStatusLastCheckTime = erlang:now()},
+					{noreply, NewState};
+				
+				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST ->
+					%% The PWRFAIL bit is ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST, but because I could read the device, 
+					%% this means the main power returns back to operation. PWRFAIL bit should be cleared, and the notification will
+					%% be send out next time when checking power status.
+					do_pwrfail_clear(),
+					
+					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}}
+			end;
+				
+		{error, _ER} ->
+			%% Faild to read PWR status.
+			%% I guess the whole RTC module is not available due to power failure.
+			case State#state.pwrStatus of
+				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST ->
+					%% Do nothing, just update timestamp of power checking.
+					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}};
+				
+				_->	%% Send notification about power failure.
+					[begin
+						 Pid ! ?NOTIFICATION_PWR_IS_LOST 
+					 end || Pid <- State#state.pwrStatusNotificationPidList],
+					
+					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
+										   pwrStatusLastCheckTime = erlang:now()},
+					{noreply, NewState}
+			end
+	end;
+	
 handle_info(_Info, State) ->
 	{noreply, State}.
 
@@ -652,7 +815,7 @@ do_ctrl_bit_out_set(CtrlBitOut) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_out, CtrlBitOut, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["CONTROL REG OUT bit has been."]),
+					?DO_INFO("CONTROL REG OUT bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG OUT bit.", [{reason, ER}]),
@@ -674,7 +837,7 @@ do_ctrl_bit_sqwen_set(Sqwen) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwEn, Sqwen, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["CONTROL REG SQWEN bit has been."]),
+					?DO_INFO("CONTROL REG SQWEN bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG SQWEN bit", [{reason, ER}]),
@@ -696,7 +859,7 @@ do_ctrl_bit_extosc_set(Extosc) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_extOsc, Extosc, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["CONTROL REG EXTOSC bit has been."]),
+					?DO_INFO("CONTROL REG EXTOSC bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG EXTOSC bit.", [{reason, ER}]),
@@ -718,7 +881,7 @@ do_ctrl_bit_crstrim_set(Crstrim) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_crsTrim, Crstrim, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["CONTROL REG CRSTRIM bit has been."]),
+					?DO_INFO("CONTROL REG CRSTRIM bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG CRSTRIM bit.", [{reason, ER}]),
@@ -740,7 +903,7 @@ do_ctrl_bit_sqwfs_set(Sqwfs) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwfs, Sqwfs, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["CONTROL REG SQWFS bit has been."]),
+					?DO_INFO("CONTROL REG SQWFS bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG SQWFS bit.", [{reason, ER}]),
@@ -781,7 +944,7 @@ do_pwrfail_clear() ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_pwrFail, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["PWRFAIL bit has been cleared."]),
+					?DO_INFO("PWRFAIL bit has been cleared", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set PWRFAIIL bit", [{reason, ER}]),
@@ -887,7 +1050,7 @@ do_vbaten_set(Vbaten) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_vBatEn, Vbaten, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["VBATEN bit has been set."]),
+					?DO_INFO("VBATEN bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set VBATEN bit", [{reason, ER}]),
@@ -934,8 +1097,7 @@ do_alarm_interrupt_enable(AlarmId) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmId
 				{ok, RegisterValue} ->
 					case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, AlarmIdIdx, ?RTC_CTRL_BIT_ALM_Ax_EN, on_line) of
 						{ok,_} ->
-							error_logger:info_report(["Alarm interrupt has been enabled.",
-													  {alarmId, AlarmId}]),
+							?DO_INFO("Alarm interrupt has been enabled", [{alarmId, AlarmId}]),
 							ok;
 						ER->
 							?DO_ERR("Failed to enable alarm interrupt", [{alarmId, AlarmId},{reason, ER}]),
@@ -967,8 +1129,7 @@ do_alarm_interrupt_disable(AlarmId) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmI
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, AlarmIdIdx, ?RTC_CTRL_BIT_ALM_Ax_DIS, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["Alarm interrupt has been disabled.",
-											  {alarmId, AlarmId}]),
+					?DO_INFO("Alarm interrupt has been disabled", [{alarmId, AlarmId}]),
 					ok;
 				ER->
 					?DO_ERR("Failed to disable alarm interrupt", [{alarmId, AlarmId},{reason, ER}]),
@@ -1105,7 +1266,7 @@ do_alarm_configure(AlarmId, DateAndTime, Mask, InterruptStatus, InterruptOutPol)
 									  {?MODULE, AlarmInterruptStatusSetFunc, [AlarmId]}], ok),
 	case Result of
 		ok ->
-			error_logger:info_report(["Alarm has been configured.", {alarmId, AlarmId}]);
+			?DO_INFO("Alarm interrupt has been configured", [{alarmId, AlarmId}]);
 		ER->	
 			?DO_ERR("Failed to configure Alarm", [{alamId, AlarmId},{reason, ER}])
 	end,
@@ -1274,7 +1435,7 @@ do_oscillator_start() ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, RegisterRec, #rtcSecondReg.address, #rtcSecondReg.bit_st, ?RTC_SECOND_BIT_ST_EN, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["RTC oscillator has been started."]),
+					?DO_INFO("RTC oscillator has been started", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to start RTC oscillator", [{reason, ER}]),
@@ -1297,7 +1458,7 @@ do_oscillator_stop() ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, RegisterRec, #rtcSecondReg.address, #rtcSecondReg.bit_st, ?RTC_SECOND_BIT_ST_DIS, on_line) of
 				{ok,_} ->
-					error_logger:info_report(["RTC oscillator has been stopped."]),
+					?DO_INFO("RTC oscillator has been stopped", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to stop RTC oscillator", [{reason, ER}]),
@@ -1367,8 +1528,7 @@ do_date_and_time_set(DateAndTime) when is_tuple(DateAndTime)->
 		ok ->
 			%% Re-start RTC oscillator
 			do_oscillator_start(),
-			
-			error_logger:info_report(["Date and Time has been configured in RTC.", {dateAndTime, DateAndTime}]);
+			?DO_INFO("Date and Time has been configured in RTC", [{dateAndTime, DateAndTime}]);
 		ER-> 
 			?DO_ERR("Failed to setup Date and Time in RTC", [{dateAndTime, DateAndTime},{reason, ER}])
 	end,
@@ -1413,7 +1573,7 @@ do_year_set(RegType, Year) ->
 														   {BitYearOneIdx, B0}
 														  ],on_line) of
 		{ok,_} ->
-			error_logger:info_report(["Year has been set in RTC."]),
+			?DO_INFO("Year has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Year in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1456,7 +1616,7 @@ do_year_set(RegType, Year) ->
 														   {BitMonthOneIdx, B0}
 														  ],on_line) of
 		{ok,_}  ->
-			error_logger:info_report(["Month has been set in RTC."]),
+			?DO_INFO("Month has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Month in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1499,7 +1659,7 @@ do_year_set(RegType, Year) ->
 														   {BitDateOneIdx, B0}
 														  ],on_line) of
 		{ok,_}  ->
-			error_logger:info_report(["Date has been set in RTC."]),
+			?DO_INFO("Date has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Date in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1551,7 +1711,7 @@ do_hour_set(RegType, {AMPM, Hour}) ->
 														   {Bit12HHrOneIdx, B0}
 														  ],on_line) of
 		{ok,_}  ->
-			error_logger:info_report(["Hour has been set in RTC."]),
+			?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Hour in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1590,7 +1750,7 @@ do_hour_set(RegType, {AMPM, Hour}) ->
 														   {Bit24HHrOneIdx, B0}
 														  ],on_line) of
 		{ok,_} ->
-			error_logger:info_report(["Hour has been set in RTC."]),
+			?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Hour in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1632,7 +1792,7 @@ do_minute_set(RegType, Minute) ->
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitMinuteTenIdx, B1},
 														   {BitMinuteOneIdx, B0}], on_line) of
 		{ok,_} ->
-			error_logger:info_report(["Minute has been set in RTC."]),
+			?DO_INFO("Minute has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Minute in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1677,7 +1837,7 @@ do_second_set(RegType, Second) ->
 			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitSecTenIdx, B1},
 																			   {BitSecOneIdx, B0}], on_line) of
 				{ok,_} ->
-					error_logger:info_report(["Second has been set in RTC."]),
+					?DO_INFO("Second has been set in RTC", [{regType, RegType}]),
 					ok;
 				ER->
 					?DO_ERR("Faild to set Second in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1719,7 +1879,7 @@ do_wday_set(RegType, WDay) ->
 			%% Prepare register that write into the RTC device.
 			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitWDayIdx, WDay}], on_line) of
 				{ok,_} ->
-					error_logger:info_report(["WDay has been set in RTC."]),
+					?DO_INFO("WDay has been set in RTC", [{regType, RegType}]),
 					ok;
 				ER->
 					?DO_ERR("Faild to set WDay in RTC", [{regType, RegType}, {reason, ER}]),
