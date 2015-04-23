@@ -36,11 +36,6 @@
 		 test_alarm_interrupt/0]).
 
 %% ====================================================================
-%% PWR checking and notification related functions
-%% ====================================================================
--export([pwr_status_change_subscribe/0, pwr_status_change_subscribe/1, pwr_status_change_unsubscribe/1]).
-
-%% ====================================================================
 %% Control register setting
 %% ====================================================================
 -export([ctrl_bit_out_set/1,
@@ -55,7 +50,10 @@
 -export([pwrfail_bit_read/0, 
 		 pwrfail_bit_clear/0,
 		 pwr_down_date_and_time_get/0,
-		 pwr_up_date_and_time_get/0]).
+		 pwr_up_date_and_time_get/0,
+		 pwr_status_change_subscribe/0, 
+		 pwr_status_change_subscribe/1, 
+		 pwr_status_change_unsubscribe/1]).
 
 %% ====================================================================
 %% Battery backup related functions
@@ -67,7 +65,7 @@
 %% ====================================================================
 -export([alarm_interrupt_enable_disable/2,
 		 alarm_interrupt_is_enabled/1,
-		 interrupt_flag_clear/1, 
+		 alarm_interrupt_flag_clear/1, 
 		 alarm_interrupt_flag_check/1,
 		 alarm_configure/5,
 		 alarm_date_and_time_get/1]).
@@ -178,16 +176,10 @@
 				}).
 
 %% ====================================================================
-%% Notifications
-%% ====================================================================
--define(NOTIFICATION_PWR_IS_BACK, main_power_is_back).
--define(NOTIFICATION_PWR_IS_LOST, main_power_is_lost).
-
-%% ====================================================================
 %% @doc
 %% Start driver.
 %% @end
--spec start(time_format(), rtc_vbaten()) -> ok | {error, term()}.
+-spec start(time_format(), rtc_vbaten()) -> {ok, pid()} | {error, term()}.
 %% ====================================================================
 start(TimeFormat, VBatEn) ->
 	case whereis(?SERVER) of
@@ -228,37 +220,6 @@ test_alarm_interrupt() ->
 	{ok, {{Y,M,D},{H,Min,S}}} = date_and_time_get(),
 	
 	alarm_configure(?RTC_ALARM_0_ID, {{Y,M,D},{H,Min+1,S}}, ?RTC_ALMxWKDAY_BIT_ALMxMASK_ALL_MATCH, ?RTC_CTRL_BIT_ALM_Ax_EN, ?RTC_ALMxWKDAY_BIT_ALMPOL_HIGH).
-
-%% ====================================================================
-%% PWR checking and notification related functions
-%% ====================================================================
-
-%% ====================================================================
-%% @doc
-%% Subscribe to PWR DOWN/UP events.
-%% @end
--spec pwr_status_change_subscribe() -> ok | {error, term()}.
-%% ====================================================================
-pwr_status_change_subscribe() ->
-	pwr_status_change_subscribe(self()).
-
-%% ====================================================================
-%% @doc
-%% Subscribe to PWR DOWN/UP events.
-%% @end
--spec pwr_status_change_subscribe(pid()) -> ok | {error, term()}.
-%% ====================================================================
-pwr_status_change_subscribe(PidToSendNotification) ->
-	do_gen_server_call({pwr_status_change_subscribe, PidToSendNotification}).
-
-%% ====================================================================
-%% @doc
-%% Unsubscribe to PWR DOWN/UP events.
-%% @end
--spec pwr_status_change_unsubscribe(pid()) -> ok | {error, term()}.
-%% ====================================================================
-pwr_status_change_unsubscribe(PidToSendNotification) ->
-	do_gen_server_call({pwr_status_change_unsubscribe, PidToSendNotification}).
 
 
 %% ====================================================================
@@ -344,6 +305,33 @@ pwr_up_date_and_time_get() ->
 
 %% ====================================================================
 %% @doc
+%% Subscribe to PWR DOWN/UP events.
+%% @end
+-spec pwr_status_change_subscribe() -> ok | {error, term()}.
+%% ====================================================================
+pwr_status_change_subscribe() ->
+	pwr_status_change_subscribe(self()).
+
+%% ====================================================================
+%% @doc
+%% Subscribe to PWR DOWN/UP events.
+%% @end
+-spec pwr_status_change_subscribe(pid()) -> ok | {error, term()}.
+%% ====================================================================
+pwr_status_change_subscribe(PidToSendNotification) ->
+	do_gen_server_call({pwr_status_change_subscribe, PidToSendNotification}).
+
+%% ====================================================================
+%% @doc
+%% Unsubscribe to PWR DOWN/UP events.
+%% @end
+-spec pwr_status_change_unsubscribe(pid()) -> ok | {error, term()}.
+%% ====================================================================
+pwr_status_change_unsubscribe(PidToSendNotification) ->
+	do_gen_server_call({pwr_status_change_unsubscribe, PidToSendNotification}).
+
+%% ====================================================================
+%% @doc
 %% Read VBATEN bit
 %% @end
 -spec vbaten_read() -> {ok, rtc_vbaten()} | {error, term()}.
@@ -384,9 +372,9 @@ alarm_interrupt_is_enabled(AlarmId) ->
 %% @doc
 %% Clear interrupt flag bit.
 %% @end
--spec interrupt_flag_clear(rtc_alarm_id()) -> ok | {error, term()}.
+-spec alarm_interrupt_flag_clear(rtc_alarm_id()) -> ok | {error, term()}.
 %% ====================================================================
-interrupt_flag_clear(AlarmId) ->
+alarm_interrupt_flag_clear(AlarmId) ->
 	do_gen_server_call({execute_mfa, {?MODULE, do_alarm_interrupt_flag_clear,[AlarmId]}}).
 
 %% ====================================================================
@@ -406,8 +394,8 @@ alarm_interrupt_flag_check(AlarmId) ->
 %% @end
 -spec alarm_configure(rtc_alarm_id(), datetime(), rtc_alarm_mask(), rtc_alarm_interrupt_en_status(), rtc_alarm_interrupt_out_pol()) -> ok | {error, term()}.
 %% ====================================================================
-alarm_configure(AlarmId, DateAndTime, Mask, InterruptStatus, InterruptOutPol) ->
-	do_gen_server_call({execute_mfa, {?MODULE, do_alarm_configure,[AlarmId, DateAndTime, Mask, InterruptStatus, InterruptOutPol]}}).
+alarm_configure(AlarmId, DateAndTime, Mask, InterruptEnStatus, InterruptOutPol) ->
+	do_gen_server_call({execute_mfa, {?MODULE, do_alarm_configure,[AlarmId, DateAndTime, Mask, InterruptEnStatus, InterruptOutPol]}}).
 
 %% ====================================================================
 %% @doc
@@ -1227,13 +1215,13 @@ do_alarm_interrupt_flag_check(AlarmId) ->
 %% @end
 -spec do_alarm_configure(rtc_alarm_id(), datetime(), rtc_alarm_mask(), rtc_alarm_interrupt_en_status(), rtc_alarm_interrupt_out_pol()) -> ok | {error, term()}.
 %% ====================================================================
-do_alarm_configure(AlarmId, DateAndTime, Mask, InterruptStatus, InterruptOutPol) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmId == ?RTC_ALARM_1_ID)->
+do_alarm_configure(AlarmId, DateAndTime, Mask, InterruptEnStatus, InterruptOutPol) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmId == ?RTC_ALARM_1_ID)->
 	%% Prepare alarm SECOND, MINUTE, HOUR, WDAY, DATE and MATCH registers.
  	{FullDate, Time} = DateAndTime,
  	{_Year,Month,Date} = FullDate,
  	{Hour,Minute,Second} = Time,
 	
-	AlarmInterruptStatusSetFunc = case InterruptStatus of
+	AlarmInterruptStatusSetFunc = case InterruptEnStatus of
 									  ?RTC_CTRL_BIT_ALM_Ax_EN ->
 										  do_alarm_interrupt_enable;
 									  _-> do_alarm_interrupt_disable

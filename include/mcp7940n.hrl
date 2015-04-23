@@ -14,6 +14,12 @@
 -include("ale_common.hrl").
 
 %% ====================================================================
+%% Notifications
+%% ====================================================================
+-define(NOTIFICATION_PWR_IS_BACK, main_power_is_back).
+-define(NOTIFICATION_PWR_IS_LOST, main_power_is_lost).
+
+%% ====================================================================
 %% This is the I2C address of external MCP7940N clock chip.
 %% This is 7bit address!!
 %% ====================================================================
