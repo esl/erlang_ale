@@ -497,8 +497,8 @@ init([TimeFormat, Vbaten]) ->
 		{ok, ?RTC_WKDAY_BIT_VBATEN_EN} ->
 			%% Read PWRFAIL bit and decide full DATE and TIME configuration is needed or not.
 			case do_pwrfail_read() of
-				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST ->
-					?DO_INFO("Power failure status", [{pwrfail, {?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST, "Primary power was lost"}}]),
+				?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST ->
+					?DO_INFO("Power failure status", [{pwrfail, {?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST, "Primary power was lost"}}]),
 					
 					%% Clear PWRFAIL bit
 					do_pwrfail_clear(),
@@ -687,83 +687,85 @@ handle_cast(_Msg, State) ->
 %% ====================================================================
 handle_info({pwr_status_check}, State) ->
 	%% Check status of PWR.
+	
 	case do_pwrfail_read() of
-		{ok, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST} ->
-			%% Currently the power is not lost.
-			
-			case State#state.pwrStatus of
-				undefined ->
-					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
-										   pwrStatusLastCheckTime = erlang:now()},
-					{noreply, NewState};
+		{ok, Current_PWRFAIL_bit_status} ->
+			case Current_PWRFAIL_bit_status of
+				?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST ->
+					%% Currently the power is not lost.
+					
+					case State#state.pwrStatus of
+						undefined ->
+							%% Initial case, when RTC driver was started.
+							NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST,
+												   pwrStatusLastCheckTime = erlang:now()},
+							{noreply, NewState};
+						
+						?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST ->
+							%% Power status has not been changed since the last time when it was checked.
+							{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}};
+						
+						?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST ->
+							%% This case should not be happened!!!
+							?DO_ERR("Unexpected case happened when handle RTC PWR check.", [{genServerStateRec, State}, {readPwrFailBit, Current_PWRFAIL_bit_status}, {lastKnownPwrStatus, State#state.pwrStatus}]),
+							{noreply, State}
+					end;
 				
-				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST ->
-					%% Power status has not been changed since the last time when it was checked.
-					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}};
-				
-				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST ->
-					%% Last known power status is: lost
-					%% This means the power status has been changed from "lost" to "not lost".
-					%% Do send notification about it.
-					%% Read Power Down/Up TimeStamps and send these togather with ordinarz notification.
-					
-					PwrDownTS = do_pwr_down_date_and_time_get(),
-					PwrUpTS = do_pwr_up_date_and_time_get(),
-					
-					[begin
-						 Pid ! {?NOTIFICATION_PWR_IS_BACK, PwrDownTS, PwrUpTS} 
-					 end || Pid <- State#state.pwrStatusNotificationPidList],
-					
-					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST,
-										   pwrStatusLastCheckTime = erlang:now()},
-					{noreply, NewState}
-			end;
-			
-		{ok, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST} ->
-			%% Currently the PWRFAIL bit status is lost, but the power should returns back because I could read the device,
-			%% thus, PWRFAIL bit should be cleared.
-			
-			case State#state.pwrStatus of
-				undefined ->
-					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
-										   pwrStatusLastCheckTime = erlang:now()},
-					{noreply, NewState};
-
-				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST ->
-					%% Last known power status is: not lost
-					%% This means the power status has been changed from "not lost" to "lost".
-					%% Do send notification about it.
-					[begin
-						 Pid ! {?NOTIFICATION_PWR_IS_LOST} 
-					 end || Pid <- State#state.pwrStatusNotificationPidList],
-					
-					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
-										   pwrStatusLastCheckTime = erlang:now()},
-					{noreply, NewState};
-				
-				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST ->
-					%% The PWRFAIL bit is ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST, but because I could read the device, 
-					%% this means the main power returns back to operation. PWRFAIL bit should be cleared, and the notification will
-					%% be send out next time when checking power status.
-					do_pwrfail_clear(),
-					
-					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}}
+				?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST ->
+					case State#state.pwrStatus of
+						?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST ->
+							%% The PWRFAIL bit is ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST, but because I could read the device, 
+							%% this means the main power returns back to operation. PWRFAIL bit should be cleared, and the notification should
+							%% be send out.
+							
+							PwrDownTS = do_pwr_down_date_and_time_get(),
+							PwrUpTS = do_pwr_up_date_and_time_get(),
+							
+							do_pwrfail_clear(),
+							
+							?DO_INFO("Main power of RTC is back", []),
+							
+							[begin
+								 Pid ! {?NOTIFICATION_PWR_IS_BACK, PwrDownTS, PwrUpTS} 
+							 end || Pid <- State#state.pwrStatusNotificationPidList],
+							
+							{noreply, State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST,
+												  pwrStatusLastCheckTime = erlang:now()}};
+						
+						_->
+							%% Last known power status is: not lost/undefined
+							%% This means the power status has been changed from "not lost" to "lost".
+							%% Do send notification about it.
+							
+							?DO_INFO("Main power of RTC is lost", []),
+							
+							[begin
+								 Pid ! {?NOTIFICATION_PWR_IS_LOST} 
+							 end || Pid <- State#state.pwrStatusNotificationPidList],
+							
+							NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST,
+												   pwrStatusLastCheckTime = erlang:now()},
+							{noreply, NewState}
+					end
 			end;
 		
 		{error, _ER} ->
 			%% Faild to read PWR status.
 			%% I guess the whole RTC module is not available due to power failure.
 			case State#state.pwrStatus of
-				?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST ->
-					%% Do nothing, just update timestamp of power checking.
+				?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST ->
+					%% Do nothing.
 					{noreply, State#state{pwrStatusLastCheckTime = erlang:now()}};
 				
 				_->	%% Send notification about power failure.
+					
+					?DO_INFO("Main power of RTC is lost", []),
+					
 					[begin
 						 Pid ! {?NOTIFICATION_PWR_IS_LOST} 
 					 end || Pid <- State#state.pwrStatusNotificationPidList],
 					
-					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,
+					NewState = State#state{pwrStatus = ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST,
 										   pwrStatusLastCheckTime = erlang:now()},
 					{noreply, NewState}
 			end
@@ -942,7 +944,7 @@ do_pwrfail_read() ->
 do_pwrfail_clear() ->
 	case read(erlang:element(#rtcWkDayReg.address, #rtcWkDayReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_pwrFail, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST, on_line) of
+			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_pwrFail, ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST, on_line) of
 				{ok,_} ->
 					?DO_INFO("PWRFAIL bit has been cleared", []),
 					ok;

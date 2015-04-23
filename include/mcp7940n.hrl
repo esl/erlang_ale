@@ -142,9 +142,9 @@
 -define(RTC_WKDAY_BIT_OSCRUN_DIS,			0).
 -define(RTC_WKDAY_BIT_OSCRUN_MASK,			2#00100000).
 
--define(RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST,	1).
--define(RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST,0).
--define(RTC_WKDAY_BIT_PWRFAIL_MASK,			2#00010000).
+-define(RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST,	1).
+-define(RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST,0).
+-define(RTC_WKDAY_BIT_PWRFAIL_MASK,				2#00010000).
 
 -define(RTC_WKDAY_BIT_VBATEN_EN,			1).
 -define(RTC_WKDAY_BIT_VBATEN_DIS,			0).
@@ -155,7 +155,7 @@
 -record(rtcWkDayReg, {
 					  address = 16#03,
 					  bit_oscRun = #bitParam{value = [?RTC_WKDAY_BIT_OSCRUN_EN, ?RTC_WKDAY_BIT_OSCRUN_DIS], mask = ?RTC_WKDAY_BIT_OSCRUN_MASK, doshiftvalue = true},
-					  bit_pwrFail = #bitParam{value = [?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST, ?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST], mask = ?RTC_WKDAY_BIT_PWRFAIL_MASK, doshiftvalue = true},
+					  bit_pwrFail = #bitParam{value = [?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST, ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST], mask = ?RTC_WKDAY_BIT_PWRFAIL_MASK, doshiftvalue = true},
 					  bit_vBatEn = #bitParam{value = [?RTC_WKDAY_BIT_VBATEN_EN, ?RTC_WKDAY_BIT_VBATEN_DIS], mask = ?RTC_WKDAY_BIT_VBATEN_MAS, doshiftvalue = true},
 					  bit_wDay = #bitParam{value = ?RTC_WKDAY_BIT_WKDAY, mask = ?RTC_WKDAY_BIT_WKDAY_MASK, doshiftvalue = true}
 					 }).
@@ -573,8 +573,8 @@
 -type rtc_ctrl_bit_sqwfs_32768Hz()	::	?RTC_CTRL_BIT_SQWFS_32768Hz.
 -type rtc_ctrl_bit_sqwfs()			::	rtc_ctrl_bit_sqwfs_1Hz() | rtc_ctrl_bit_sqwfs_4096Hz() | rtc_ctrl_bit_sqwfs_8192Hz() | rtc_ctrl_bit_sqwfs_32768Hz().
 
--type rtc_pwrfail_primary_power_lost()		::	?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRLOST.
--type rtc_pwrfail_primary_power_not_lost()	::	?RTC_WKDAY_BIT_PWRFAIL_PRIMPWRNOTLOST.
+-type rtc_pwrfail_primary_power_lost()		::	?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_LOST.
+-type rtc_pwrfail_primary_power_not_lost()	::	?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST.
 -type rtc_pwrfail()							::	rtc_pwrfail_primary_power_lost() | rtc_pwrfail_primary_power_not_lost().
 
 -type rtc_vbaten_en()	::	?RTC_WKDAY_BIT_VBATEN_EN.
