@@ -52,8 +52,8 @@
 %% ====================================================================
 %% Power failure related functions
 %% ====================================================================
--export([pwrfail_read/0, 
-		 pwrfail_clear/0,
+-export([pwrfail_bit_read/0, 
+		 pwrfail_bit_clear/0,
 		 pwr_down_date_and_time_get/0,
 		 pwr_up_date_and_time_get/0]).
 
@@ -110,8 +110,8 @@
 %% ====================================================================
 %% Power failure related functions
 %% ====================================================================
-		 do_pwrfail_read/0,
-		 do_pwrfail_clear/0,
+		 do_pwrfail_bit_read/1,
+		 do_pwrfail_bit_clear/0,
 		 do_pwr_down_date_and_time_get/0,
 		 do_pwr_up_date_and_time_get/0,
 		 
@@ -310,19 +310,19 @@ ctrl_bit_sqwfs_set(Sqwfs) ->
 %% @doc
 %% Read PWRFAIL bit
 %% @end
--spec pwrfail_read() -> {ok, rtc_pwrfail()} | {error, term()}.
+-spec pwrfail_bit_read() -> {ok, rtc_pwrfail()} | {error, term()}.
 %% ====================================================================
-pwrfail_read() ->
-	do_gen_server_call({execute_mfa, {?MODULE, do_pwrfail_read,[]}}).
+pwrfail_bit_read() ->
+	do_gen_server_call({execute_mfa, {?MODULE, do_pwrfail_bit_read,[true]}}).
 
 %% ====================================================================
 %% @doc
 %% Clear PWRFAIL bit
 %% @end
--spec pwrfail_clear() -> ok | {error, term()}.
+-spec pwrfail_bit_clear() -> ok | {error, term()}.
 %% ====================================================================
-pwrfail_clear() ->
-	do_gen_server_call({execute_mfa, {?MODULE, do_pwrfail_clear,[]}}).
+pwrfail_bit_clear() ->
+	do_gen_server_call({execute_mfa, {?MODULE, do_pwrfail_bit_clear,[]}}).
 
 %% ====================================================================
 %% @doc
@@ -496,12 +496,12 @@ init([TimeFormat, Vbaten]) ->
 	case do_vbaten_read() of
 		{ok, ?RTC_WKDAY_BIT_VBATEN_EN} ->
 			%% Read PWRFAIL bit and decide full DATE and TIME configuration is needed or not.
-			case do_pwrfail_read() of
+			case do_pwrfail_bit_read(true) of
 				?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST ->
 					?DO_INFO("Power failure status", [{pwrfail, {?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST, "Primary power was lost"}}]),
 					
 					%% Clear PWRFAIL bit
-					do_pwrfail_clear(),
+					do_pwrfail_bit_clear(),
 					
 					%% Recunfigure DateAndTime. Good to know, that Erlang/OTP can serve time in 24H format.
 					%% So if 12H format is the selected what RTC should use, the time should be prepared here before
@@ -688,7 +688,7 @@ handle_cast(_Msg, State) ->
 handle_info({pwr_status_check}, State) ->
 	%% Check status of PWR.
 	
-	case do_pwrfail_read() of
+	case do_pwrfail_bit_read(false) of
 		{ok, Current_PWRFAIL_bit_status} ->
 			case Current_PWRFAIL_bit_status of
 				?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST ->
@@ -721,7 +721,7 @@ handle_info({pwr_status_check}, State) ->
 							PwrDownTS = do_pwr_down_date_and_time_get(),
 							PwrUpTS = do_pwr_up_date_and_time_get(),
 							
-							do_pwrfail_clear(),
+							do_pwrfail_bit_clear(),
 							
 							?DO_INFO("Main power of RTC is back", []),
 							
@@ -750,6 +750,8 @@ handle_info({pwr_status_check}, State) ->
 			end;
 		
 		{error, _ER} ->
+			%%?DO_ERR("Failed to read PWRFAIIL bit", [{reason, ER}]),
+			
 			%% Faild to read PWR status.
 			%% I guess the whole RTC module is not available due to power failure.
 			case State#state.pwrStatus of
@@ -924,14 +926,18 @@ do_ctrl_bit_sqwfs_set(Sqwfs) ->
 %% @doc
 %% Read PWRFAIL bit
 %% @end
--spec do_pwrfail_read() -> {ok, rtc_pwrfail()} | {error, term()}.
+-spec do_pwrfail_bit_read(boolean()) -> {ok, rtc_pwrfail()} | {error, term()}.
 %% ====================================================================
-do_pwrfail_read() ->
+do_pwrfail_bit_read(DoPrintErrorIfItIs) ->
 	case bitfield_get(#rtcWkDayReg{}, {addrIdx, #rtcWkDayReg.address}, #rtcWkDayReg.bit_pwrFail) of
 		[{#rtcWkDayReg.bit_pwrFail, Pwrfail}] ->
 			{ok, Pwrfail};
 		ER ->
-			?DO_ERR("Failed to read PWRFAIIL bit", [{reason, ER}]),
+			case DoPrintErrorIfItIs of
+				true ->
+					?DO_ERR("Failed to read PWRFAIIL bit", [{reason, ER}]);
+				_->	do_nothing
+			end,
 			ER
 	end.
 
@@ -939,9 +945,9 @@ do_pwrfail_read() ->
 %% @doc
 %% Clear PWRFAIL bit
 %% @end
--spec do_pwrfail_clear() -> ok | {error, term()}.
+-spec do_pwrfail_bit_clear() -> ok | {error, term()}.
 %% ====================================================================
-do_pwrfail_clear() ->
+do_pwrfail_bit_clear() ->
 	case read(erlang:element(#rtcWkDayReg.address, #rtcWkDayReg{})) of
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_pwrFail, ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST, on_line) of
