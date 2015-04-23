@@ -130,7 +130,7 @@ init([]) ->
 		{ok,_Pid} ->
 			%% Configure INT_PIN for input to able to receive interrupts from RTC.
 			Result = ale_handler:gpio_set_int(?INT_PIN, ?INT_CONDITION, self()),
-			error_logger:info_report(["INT_PIN has been configured and interrupt has been configured", {result, Result}]),
+			error_logger:info_report([string:concat(string:concat("INT_PIN (GPIO-", erlang:integer_to_list(?INT_PIN)), ") and interrupt conditions have been configured"), {result, Result}]),
 			
     		{ok, #state{}};
 		{error, ER} ->
@@ -219,7 +219,7 @@ handle_info({gpio_interrupt, Pin, Condition},State) ->
 			
 			error_logger:info_report(["RTC interrupt has been occurred.", {gpio, Pin}, {interrupt_condition, Condition}]);
 		{ok, AlarmFlag} ->
-			error_logger:error_report(["Unexpected interrupt has been occured - alarm flag does not matches.", 
+			error_logger:error_report(["Unexpected interrupt has been occurred - alarm flag does not matches.", 
 									   {gpio, Pin}, 
 									   {interrupt_condition, Condition},
 									   {expectedAlarmModule, ?ALARM_MODULE},

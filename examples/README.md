@@ -222,3 +222,129 @@ Here is the schematic about the circuit:
 		ok
 		3>
 
+# ex_mcp7940n - Configure Date&Time and Alarm in RTC device
+This example introduces how to configure Date&Time in MCP7940n RTC device and it also shows how easy to configure alarm module for a specific Date&Time.
+For this example GPIO-17 on Raspberry has been used as an input PIN. This PIN will receives the interrupts from RTC device. The below schematic can say much more about it.
+
+![CONFIGURE RTC DEVICE schematic](../doc/images/schematic-ex_mcp7940n.png)
+
+The current Date&Time (LOCALTIME) will be configured into the RTC device when start the test application and ALARM-0 module will be configured to LOCALTIME+1[min]. The interrupt PIN which is the GPIO-17 on Raspberry Pi will be configured as input for able to receive interrupts from RTC device. Below printouts show the whole sequence. Unfortunately an unexpected interrupt receives on the GPIO-17 once the interrupt condition has been configured, but this interrupt is just a "dummy". Each application who wants use GPIO interrupts must handle this independently. An example can be seen in ale_handler_gpio_int_test.erl module (see above), for how to "ignore" this very first interrupt. Current example does not has this, thus at the endd of the RTC initialization, there is an unexpected ERROR_REPORT.
+	
+	2> ex_mcp7940n:start().
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "ALE driver process has been started and registered successfully."
+	    drvModule: i2c
+	    drvStartFunction: start
+	    drvStartArgs: ["i2c-1",111]
+	    drvPid: <0.39.0>
+	    monitorRef: #Ref<0.0.0.38>
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "Alarm interrupt has been disabled"
+	    alarmId: 0
+	    module: mcp7940n
+	    line: 1128
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "Alarm interrupt has been disabled"
+	    alarmId: 1
+	    module: mcp7940n
+	    line: 1128
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "RTC oscillator has been started"
+	    module: mcp7940n
+	    line: 1434
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "RTC has been started"
+	    module: mcp7940n
+	    line: 538
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "ALE driver process has been started and registered successfully."
+	    drvModule: gpio
+	    drvStartFunction: start
+	    drvStartArgs: [17,input]
+	    drvPid: <0.41.0>
+	    monitorRef: #Ref<0.0.0.87>
+	
+	=INFO REPORT==== 23-Apr-2015::19:15:15 ===
+	    "INT_PIN (GPIO-17) and interrupt conditions have been configured"
+	    result: ok
+	{ok,<0.36.0>}
+	3>
+	=ERROR REPORT==== 23-Apr-2015::19:15:15 ===
+	    "Unexpected interrupt has been occurred - alarm flag does not matches."
+	    gpio: 17
+	    interrupt_condition: rising
+	    expectedAlarmModule: 0
+	    expectedAlarmFlag: 1
+	    readAlarmFlag: 0
+	
+	3>
+
+Configure ALARM-0 module. This part of the example shows how to configure alarm module in RTC. The alarm Date&Time will be the current Date&Time in RTC + 1 [min].
+
+	4> ex_mcp7940n:alarm_configure().
+
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Month has been set in RTC"
+	    regType: rtcAlm0MonthReg
+	    module: mcp7940n
+	    line: 1615
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Date has been set in RTC"
+	    regType: rtcAlm0DateReg
+	    module: mcp7940n
+	    line: 1658
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "WDay has been set in RTC"
+	    regType: rtcAlm0WDayReg
+	    module: mcp7940n
+	    line: 1878
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Hour has been set in RTC"
+	    regType: rtcAlm0HourReg
+	    module: mcp7940n
+	    line: 1749
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Minute has been set in RTC"
+	    regType: rtcAlm0MinReg
+	    module: mcp7940n
+	    line: 1791
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Second has been set in RTC"
+	    regType: rtcAlm0SecReg
+	    module: mcp7940n
+	    line: 1836
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Alarm interrupt has been enabled"
+	    alarmId: 0
+	    module: mcp7940n
+	    line: 1096
+	
+	=INFO REPORT==== 23-Apr-2015::19:43:57 ===
+	    "Alarm interrupt has been configured"
+	    alarmId: 0
+	    module: mcp7940n
+	    line: 1265
+	ok
+	5>
+
+An interrupt received when Date&Time reached the configured Alarm Date&Time:
+	
+	6>
+	=INFO REPORT==== 23-Apr-2015::19:45:06 ===
+	    "RTC interrupt has been occurred."
+	    gpio: 17
+	    interrupt_condition: rising
+	
+The LED connected to the GPIO-17 should LIGHT for a very short time when the interrupt received, and will be OFF when test application has been done with clearing RTC interrupt flag bit. More can be seen in the source code. Enjoy :-)
