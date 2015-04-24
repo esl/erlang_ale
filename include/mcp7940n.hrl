@@ -514,9 +514,6 @@
 -type bitfield_value()	::	0..255.	%% The end bitfield_value is not really 255, but what is supported by the OS and CPU.
 -type bitfield_mask()	::	0..255.	%% The end bitfield_value is not really 255, but what is supported by the OS and CPU.
 -type register_rec()	::	tuple().%% The tuple version of any regoster record. eq: #rtcControlReg{}
--type on_line()			::	on_line.
--type off_line()		::	off_line.
--type configure_mode()	::	on_line() | off_line().
 
 -type hour_am()			::	?RTC_HOUR_BIT_12H_AMPM_IND_AM.
 -type hour_pm()			::	?RTC_HOUR_BIT_12H_AMPM_IND_PM.

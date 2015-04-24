@@ -805,7 +805,7 @@ code_change(_OldVsn, State, _Extra) ->
 do_ctrl_bit_out_set(CtrlBitOut) ->
 	case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_out, CtrlBitOut, on_line) of
+			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_out, CtrlBitOut) of
 				{ok,_} ->
 					?DO_INFO("CONTROL REG OUT bit has been set", []),
 					ok;
@@ -827,7 +827,7 @@ do_ctrl_bit_out_set(CtrlBitOut) ->
 do_ctrl_bit_sqwen_set(Sqwen) ->
 	case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwEn, Sqwen, on_line) of
+			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwEn, Sqwen) of
 				{ok,_} ->
 					?DO_INFO("CONTROL REG SQWEN bit has been set", []),
 					ok;
@@ -849,7 +849,7 @@ do_ctrl_bit_sqwen_set(Sqwen) ->
 do_ctrl_bit_extosc_set(Extosc) ->
 	case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_extOsc, Extosc, on_line) of
+			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_extOsc, Extosc) of
 				{ok,_} ->
 					?DO_INFO("CONTROL REG EXTOSC bit has been set", []),
 					ok;
@@ -871,7 +871,7 @@ do_ctrl_bit_extosc_set(Extosc) ->
 do_ctrl_bit_crstrim_set(Crstrim) ->
 	case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_crsTrim, Crstrim, on_line) of
+			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_crsTrim, Crstrim) of
 				{ok,_} ->
 					?DO_INFO("CONTROL REG CRSTRIM bit has been set", []),
 					ok;
@@ -893,7 +893,7 @@ do_ctrl_bit_crstrim_set(Crstrim) ->
 do_ctrl_bit_sqwfs_set(Sqwfs) ->
 	case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwfs, Sqwfs, on_line) of
+			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwfs, Sqwfs) of
 				{ok,_} ->
 					?DO_INFO("CONTROL REG SQWFS bit has been set", []),
 					ok;
@@ -938,7 +938,7 @@ do_pwrfail_bit_read(DoPrintErrorIfItIs) ->
 do_pwrfail_bit_clear() ->
 	case read(erlang:element(#rtcWkDayReg.address, #rtcWkDayReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_pwrFail, ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST, on_line) of
+			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_pwrFail, ?RTC_WKDAY_BIT_PWRFAIL_PRIM_PWR_NOT_LOST) of
 				{ok,_} ->
 					?DO_INFO("PWRFAIL bit has been cleared", []),
 					ok;
@@ -1044,7 +1044,7 @@ do_vbaten_read() ->
 do_vbaten_set(Vbaten) ->
 	case read(erlang:element(#rtcWkDayReg.address, #rtcWkDayReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_vBatEn, Vbaten, on_line) of
+			case bitfield_set(RegisterValue, #rtcWkDayReg{}, #rtcWkDayReg.address, #rtcWkDayReg.bit_vBatEn, Vbaten) of
 				{ok,_} ->
 					?DO_INFO("VBATEN bit has been set", []),
 					ok;
@@ -1091,7 +1091,7 @@ do_alarm_interrupt_enable(AlarmId) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmId
 		_->
 			case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 				{ok, RegisterValue} ->
-					case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, AlarmIdIdx, ?RTC_CTRL_BIT_ALM_Ax_EN, on_line) of
+					case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, AlarmIdIdx, ?RTC_CTRL_BIT_ALM_Ax_EN) of
 						{ok,_} ->
 							?DO_INFO("Alarm interrupt has been enabled", [{alarmId, AlarmId}]),
 							ok;
@@ -1123,7 +1123,7 @@ do_alarm_interrupt_disable(AlarmId) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmI
 	
 	case read(erlang:element(#rtcControlReg.address, #rtcControlReg{})) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, AlarmIdIdx, ?RTC_CTRL_BIT_ALM_Ax_DIS, on_line) of
+			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, AlarmIdIdx, ?RTC_CTRL_BIT_ALM_Ax_DIS) of
 				{ok,_} ->
 					?DO_INFO("Alarm interrupt has been disabled", [{alarmId, AlarmId}]),
 					ok;
@@ -1177,7 +1177,7 @@ do_alarm_interrupt_flag_clear(AlarmId) when (AlarmId == ?RTC_ALARM_0_ID) or (Ala
 													 end,
 	case read(erlang:element(RegisterAddressIdx, RegisterRec)) of
 		{ok, RegisterValue} ->
-			bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, BitFieldIdx, ?RTC_ALMxWKDAY_BIT_ALMxIF_CLEAR, on_line);
+			bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, BitFieldIdx, ?RTC_ALMxWKDAY_BIT_ALMxIF_CLEAR);
 		ER->
 			?DO_ERR("Failed to clear Alarm interrupt flag", [{alamId, AlarmId},{reason, ER}]),
 			ER
@@ -1363,7 +1363,7 @@ do_alarm_mask_set(AlarmId, Mask) when (AlarmId == ?RTC_ALARM_0_ID) or (AlarmId =
 	case read(erlang:element(RegisterAddr, RegisterRec)) of
 		{ok, RegisterValue} ->
 			%% Prepare register that write into the RTC device.
-			case bitfield_set(RegisterValue, RegisterRec, RegisterAddr, [{BitFieldIdx, Mask}], on_line) of
+			case bitfield_set(RegisterValue, RegisterRec, RegisterAddr, [{BitFieldIdx, Mask}]) of
 				{ok,_} ->
 					ok;
 				ER->ER
@@ -1391,7 +1391,7 @@ do_alarm_interrupt_out_pol_set(AlarmId, InterruptOutPol) when (AlarmId == ?RTC_A
 	case read(erlang:element(RegisterAddr, RegisterRec)) of
 		{ok, RegisterValue} ->
 			%% Prepare register that write into the RTC device.
-			case bitfield_set(RegisterValue, RegisterRec, RegisterAddr, [{BitFieldIdx, InterruptOutPol}], on_line) of
+			case bitfield_set(RegisterValue, RegisterRec, RegisterAddr, [{BitFieldIdx, InterruptOutPol}]) of
 				{ok,_} ->
 					ok;
 				ER->ER
@@ -1429,7 +1429,7 @@ do_oscillator_start() ->
 	RegisterRec = #rtcSecondReg{},
 	case read(erlang:element(#rtcSecondReg.address, RegisterRec)) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, RegisterRec, #rtcSecondReg.address, #rtcSecondReg.bit_st, ?RTC_SECOND_BIT_ST_EN, on_line) of
+			case bitfield_set(RegisterValue, RegisterRec, #rtcSecondReg.address, #rtcSecondReg.bit_st, ?RTC_SECOND_BIT_ST_EN) of
 				{ok,_} ->
 					?DO_INFO("RTC oscillator has been started", []),
 					ok;
@@ -1452,7 +1452,7 @@ do_oscillator_stop() ->
 	RegisterRec = #rtcSecondReg{},
 	case read(erlang:element(#rtcSecondReg.address, RegisterRec)) of
 		{ok, RegisterValue} ->
-			case bitfield_set(RegisterValue, RegisterRec, #rtcSecondReg.address, #rtcSecondReg.bit_st, ?RTC_SECOND_BIT_ST_DIS, on_line) of
+			case bitfield_set(RegisterValue, RegisterRec, #rtcSecondReg.address, #rtcSecondReg.bit_st, ?RTC_SECOND_BIT_ST_DIS) of
 				{ok,_} ->
 					?DO_INFO("RTC oscillator has been stopped", []),
 					ok;
@@ -1567,7 +1567,7 @@ do_year_set(RegType, Year) ->
 	%% Prepare register that write into the RTC device
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitYearTenIdx, B1},
 														   {BitYearOneIdx, B0}
-														  ],on_line) of
+														  ]) of
 		{ok,_} ->
 			?DO_INFO("Year has been set in RTC", [{regType, RegType}]),
 			ok;
@@ -1610,7 +1610,7 @@ do_year_set(RegType, Year) ->
  	%% Prepare register that write into the RTC device
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitMonthTenIdx, B1},
 														   {BitMonthOneIdx, B0}
-														  ],on_line) of
+														  ]) of
 		{ok,_}  ->
 			?DO_INFO("Month has been set in RTC", [{regType, RegType}]),
 			ok;
@@ -1653,7 +1653,7 @@ do_year_set(RegType, Year) ->
 	%% Prepare register that write into the RTC device
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitDateTenIdx, B1},
 														   {BitDateOneIdx, B0}
-														  ],on_line) of
+														  ]) of
 		{ok,_}  ->
 			?DO_INFO("Date has been set in RTC", [{regType, RegType}]),
 			ok;
@@ -1705,7 +1705,7 @@ do_hour_set(RegType, {AMPM, Hour}) ->
 														   {Bit12HAMPMIdx, AMPM},
 														   {Bit12HHrTenIdx, B1},
 														   {Bit12HHrOneIdx, B0}
-														  ],on_line) of
+														  ]) of
 		{ok,_}  ->
 			?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
 			ok;
@@ -1744,7 +1744,7 @@ do_hour_set(RegType, {AMPM, Hour}) ->
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitTimeFormatIdx, ?RTC_HOUR_BIT_TIME_FORMAT_24H},
 														   {Bit24HHrTenIdx, B1},
 														   {Bit24HHrOneIdx, B0}
-														  ],on_line) of
+														  ]) of
 		{ok,_} ->
 			?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
 			ok;
@@ -1786,7 +1786,7 @@ do_minute_set(RegType, Minute) ->
 	
 	%% Prepare register that write into the RTC device
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitMinuteTenIdx, B1},
-														   {BitMinuteOneIdx, B0}], on_line) of
+														   {BitMinuteOneIdx, B0}]) of
 		{ok,_} ->
 			?DO_INFO("Minute has been set in RTC", [{regType, RegType}]),
 			ok;
@@ -1831,7 +1831,7 @@ do_second_set(RegType, Second) ->
 			
 			%% Prepare register that write into the RTC device.
 			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitSecTenIdx, B1},
-																			   {BitSecOneIdx, B0}], on_line) of
+																			   {BitSecOneIdx, B0}]) of
 				{ok,_} ->
 					?DO_INFO("Second has been set in RTC", [{regType, RegType}]),
 					ok;
@@ -1873,7 +1873,7 @@ do_wday_set(RegType, WDay) ->
 	case read(erlang:element(RegisterAddressIdx, RegisterRec)) of
 		{ok, RegisterValue} ->
 			%% Prepare register that write into the RTC device.
-			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitWDayIdx, WDay}], on_line) of
+			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitWDayIdx, WDay}]) of
 				{ok,_} ->
 					?DO_INFO("WDay has been set in RTC", [{regType, RegType}]),
 					ok;
@@ -2269,30 +2269,30 @@ do_wday_get(RegType) ->
 %% @doc
 %% Set bitfield in a byte.
 %% @end
--spec bitfield_set(data(), register_rec(), integer(), list({integer(), data()}), configure_mode()) -> {ok, data()} | {error, term()}.
+-spec bitfield_set(data(), register_rec(), integer(), list({integer(), data()})) -> {ok, data()} | {error, term()}.
 %% ====================================================================
-bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitfieldList, OnOffLine) ->
-	bitfield_set_loop(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitfieldList, OnOffLine, "").
+bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitfieldList) ->
+	bitfield_set_loop(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitfieldList, "").
 
-bitfield_set_loop(RegisterCurrentValue, _RegisterRec, _RegisterAddressIdx, [], _OnOffLine, []) ->
+bitfield_set_loop(RegisterCurrentValue, _RegisterRec, _RegisterAddressIdx, [], []) ->
 	{ok, RegisterCurrentValue};
-bitfield_set_loop(_RegisterCurrentValue, _RegisterRec, _RegisterAddressIdx, [], _OnOffLine, Result) ->
+bitfield_set_loop(_RegisterCurrentValue, _RegisterRec, _RegisterAddressIdx, [], Result) ->
 	Result;
-bitfield_set_loop(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, [{BitFieldIdx, BitFieldNewValue} | T], OnOffLine, Result) ->
-	case bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitFieldIdx, BitFieldNewValue, OnOffLine) of
+bitfield_set_loop(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, [{BitFieldIdx, BitFieldNewValue} | T], Result) ->
+	case bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitFieldIdx, BitFieldNewValue) of
 		{ok, RegisterNewValue} ->
-			bitfield_set_loop(RegisterNewValue, RegisterRec, RegisterAddressIdx, T, OnOffLine, Result);
+			bitfield_set_loop(RegisterNewValue, RegisterRec, RegisterAddressIdx, T, Result);
 		ER->
-			bitfield_set_loop(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, [], OnOffLine, ER)
+			bitfield_set_loop(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, [], ER)
 	end.
 	
 %% ====================================================================
 %% @doc
 %% Set bitfield in a byte.
 %% @end
--spec bitfield_set(data(), register_rec(), integer(), integer(), data(), configure_mode()) -> {ok, data()} | {error, term()}.
+-spec bitfield_set(data(), register_rec(), integer(), integer(), data()) -> {ok, data()} | {error, term()}.
 %% ====================================================================
-bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitFieldIdx, BitFieldNewValue, OnOffLine) ->
+bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitFieldIdx, BitFieldNewValue) ->
 	%% Find Register Address in RegisterRec
 	Addr = erlang:element(RegisterAddressIdx, RegisterRec),
 	
@@ -2305,19 +2305,15 @@ bitfield_set(RegisterCurrentValue, RegisterRec, RegisterAddressIdx, BitFieldIdx,
 			%% New BitFieldNewValue value looks good.
 			RegisterNewValue = bit_set(RegisterCurrentValue, BitFieldNewValue, BitParam#bitParam.mask, BitParam#bitParam.doshiftvalue),
 			
-			%% Write new value of regoster into the device if it is required.
-			case OnOffLine of
-				on_line ->
-					case write(Addr, RegisterNewValue) of
-						ok ->
-							{ok, RegisterNewValue};
-						ER2->
-							ER2
-					end;
-				_->	{ok, RegisterNewValue}
+			%% Write new value of regoster into the device
+			case write(Addr, RegisterNewValue) of
+				ok ->
+					{ok, RegisterNewValue};
+				ER2->
+					ER2
 			end;
 			
-		_-> {error, {"Invalid bitfield value when call bitfield_set/6.", {{module, ?MODULE},
+		_-> {error, {"Invalid bitfield value when call bitfield_set/5.", {{module, ?MODULE},
 																		  {line, ?LINE},
 																		  {registerRec, RegisterRec},
 																		  {bitfieldIdx, BitFieldIdx},
