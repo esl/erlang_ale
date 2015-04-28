@@ -19,6 +19,9 @@
 -define(NOTIFICATION_PWR_IS_BACK, main_power_is_back).
 -define(NOTIFICATION_PWR_IS_LOST, main_power_is_lost).
 
+-define(NOTIFICATION_OSCILLATOR_IS_RUNNING, oscillator_is_running).
+-define(NOTIFICATION_OSCILLATOR_IS_NOT_RUNNING(REASON), {oscillator_is_not_running, REASON}).
+
 %% ====================================================================
 %% This is the I2C address of external MCP7940N clock chip.
 %% This is 7bit address!!
@@ -587,6 +590,10 @@
 -type rtc_oscrun_en()	::	?RTC_WKDAY_BIT_OSCRUN_EN.
 -type rtc_oscrun_dis()	::	?RTC_WKDAY_BIT_OSCRUN_DIS.
 -type rtc_oscrun()		::	rtc_oscrun_en() | rtc_oscrun_dis().
+
+-type rtc_osc_do_start()::	?RTC_SECOND_BIT_ST_EN.
+-type rtc_osc_do_stop()	::	?RTC_SECOND_BIT_ST_DIS.
+-type rtc_osc_start()	::	rtc_osc_do_start() | rtc_osc_do_stop().
 
 -define(RTC_PWR_REGISTER_TYPE_DOWN,	down).
 -define(RTC_PWR_REGISTER_TYPE_UP,	up).

@@ -51,7 +51,8 @@
 		 gpio_read/1,
 		 gpio_write/2,
 		 gpio_set_int/2, gpio_set_int/3,
-		 gpio_release/1
+		 gpio_release/1,
+		 gpio_get_driver_process/1
  		 ]).
 
 %% I2C related functions
@@ -165,6 +166,7 @@ gpio_set_int(Gpio, _IntCondition, _Destination) ->
 %% @doc
 %% Release Gpio. 
 %% @end
+-spec gpio_release(pin()) -> ok | {error, term()}.
 %% ====================================================================
 gpio_release(Gpio) when is_integer(Gpio) ->
 	%% Start ALE handler if not started yet.
@@ -179,6 +181,24 @@ gpio_release(Gpio) when is_integer(Gpio) ->
 	end;
 gpio_release(Gpio) ->
 	{error, {invalid_gpio, Gpio}}.
+
+%% ====================================================================
+%% @doc
+%% Give the DriverPorcess Pid of GPIO if that is registered already. 
+%% @end
+-spec gpio_get_driver_process(pin()) -> {ok, pid()} | {error, term()}.
+%% ====================================================================
+gpio_get_driver_process(Gpio) ->
+	%% Start ALE handler if not started yet.
+	start_link(),
+	
+	case catch gen_server:call(?SERVER, {gpio_get_driver_process, Gpio}, ?TIMEOUT_FOR_OPERATION) of
+		{'EXIT',R} ->
+			{error, {'EXIT',R}};
+		{ok, DrvPid} ->
+			{ok, DrvPid};
+		ER->ER
+	end.
 
 %% %% ====================================================================
 %% %% @doc
@@ -374,11 +394,17 @@ handle_call({gpio_write, Gpio, PinState}, _From, State) ->
 handle_call({gpio_set_int, Gpio, IntCondition, Destination}, _From, State) ->
 	%% Start driver process if not started yet.
 	Reply = case start_driver_process({?MODULE, gpio_set_int,  [Gpio, IntCondition, Destination]}, ?DRV_GPIO_MODULE, ?START_FUNC_DRV_MODULE, [Gpio, ?PIN_DIRECTION_INPUT]) of
-				{ok, Pid} ->
+				{ok, DrvPid} ->
 					%% Process is already registered for interrupt handling.
-
+					
+					%% Read GPIO value before set interrupt condition. This is needed, otherwise an unexpected inerrupt occurred on the GPIO.
+					%% The interrupt is not a real interrupt, but GPIO driver or kernel has generates this.
+					%% See the related issue: https://github.com/esl/erlang_ale/issues/26
+					
+					erlang:apply(?DRV_GPIO_MODULE, read, [DrvPid]),
+					
 					%% Configure interrupt condition.
-					case erlang:apply(?DRV_GPIO_MODULE, set_int, [Pid, IntCondition]) of
+					case erlang:apply(?DRV_GPIO_MODULE, set_int, [DrvPid, IntCondition]) of
 						ok ->
 							ok;
 						{error, R} ->
@@ -398,7 +424,14 @@ handle_call({gpio_release, Gpio}, _From, State) ->
 		
 		ER->{reply, ER, State}
 	end;
-							
+
+handle_call({gpio_get_driver_process, Gpio}, _From, State) ->
+	case get_driver_process(gpio, Gpio) of
+		{ok,R} ->
+			{reply, {ok, R#rALEHandler.drvPid}, State};
+		ER->{error,ER}
+	end;
+	
 handle_call({i2c_init, DeviceName, HWAddress}, _From, State) ->
 	Reply = case start_driver_process({?MODULE, i2c_init,  [DeviceName, HWAddress]}, ?DRV_I2C_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, HWAddress]) of
 				{ok, _DrvPid} ->
@@ -655,7 +688,7 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 			Res = case catch erlang:apply(DrvModule, DrvStartFunction, Arg) of
 				{'EXIT',R} ->
 					{error, {'EXIT',R}};
-				{ok, Pid} when is_pid(Pid) ->
+				{ok, DrvPid} when is_pid(DrvPid) ->
 					case DrvModule of
 						?DRV_GPIO_MODULE ->
 							[Gpio, PinDirection] = Arg,
@@ -664,7 +697,7 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 							SpecialCaseRes = case InitialMFA of
 												 {_Module, gpio_set_int, [_Gpio, _IntCondition, Destination]} ->
 													 %% Register interrupt process
-													 case erlang:apply(?DRV_GPIO_MODULE, register_int, [Pid, Destination]) of
+													 case erlang:apply(?DRV_GPIO_MODULE, register_int, [DrvPid, Destination]) of
 														 ok ->
 															 ok;
 														 {error, R} ->
@@ -674,17 +707,17 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 											 end,
 							case SpecialCaseRes of
 								ok ->
-									{ok, {?DRV_GPIO_MODULE, Gpio, PinDirection}, Pid};
+									{ok, {?DRV_GPIO_MODULE, Gpio, PinDirection}, DrvPid};
 								ER->ER
 							end;
 						
 						?DRV_I2C_MODULE ->
 							[DeviceName, HWAddress] = Arg,
-							{ok, {?DRV_I2C_MODULE, DeviceName, HWAddress}, Pid};
+							{ok, {?DRV_I2C_MODULE, DeviceName, HWAddress}, DrvPid};
 						
 						?DRV_SPI_MODULE ->
 							[DeviceName, SpiOptions] = Arg,
-							{ok, {?DRV_SPI_MODULE, DeviceName, SpiOptions}, Pid};
+							{ok, {?DRV_SPI_MODULE, DeviceName, SpiOptions}, DrvPid};
 						
 						_->	%% Unsupported scenario.
 							%% FIXME
@@ -694,24 +727,24 @@ start_driver_process(InitialMFA, DrvModule, DrvStartFunction, Arg) ->
 			end,
 			
 			case Res of
-				{ok, Key, DrvPid} ->
+				{ok, Key, DrvPidT} ->
 					%% Start monitor to this process.
-					MonitorRef = erlang:monitor(process, DrvPid),
+					MonitorRef = erlang:monitor(process, DrvPidT),
 					
 					%% Save all in ETS.
 					ets:insert(?ALE_HANDLER_TABLE, #rALEHandler{key = Key,
 																initialMFA = InitialMFA,
-																drvPid = DrvPid, 
+																drvPid = DrvPidT, 
 																monitorRef = MonitorRef}),
 					
 					error_logger:info_report(["ALE driver process has been started and registered successfully.",
 											  {drvModule, DrvModule},
 											  {drvStartFunction, DrvStartFunction},
 											  {drvStartArgs, Arg},
-											  {drvPid, DrvPid},
+											  {drvPid, DrvPidT},
 											  {monitorRef, MonitorRef}]),
 					
-					{ok, DrvPid};
+					{ok, DrvPidT};
 				Error->
 					error_logger:error_report(["Error occured when start ALE driver process.",
 											  {drvModule, DrvModule},

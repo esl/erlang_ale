@@ -21,7 +21,6 @@
 %% ====================================================================
 -define(SERVER, ?MODULE).
 -define(TIMEOUT, 1000).
--define(DO_RW_RTC_DEVICE, false).	%% This is only for test purpose.
 -define(DO_ERR(TEXT,TUPPLELIST), error_logger:error_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
 -define(DO_INFO(TEXT,TUPPLELIST), error_logger:info_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
 
@@ -51,8 +50,7 @@
 		 pwrfail_bit_clear/0,
 		 pwr_down_date_and_time_get/0,
 		 pwr_up_date_and_time_get/0,
-		 pwr_status_change_subscribe/0, 
-		 pwr_status_change_subscribe/1, 
+		 pwr_status_change_subscribe/0, pwr_status_change_subscribe/1, 
 		 pwr_status_change_unsubscribe/1]).
 
 %% ====================================================================
@@ -74,8 +72,11 @@
 %% Oscillator related functions
 %% ====================================================================
 -export([oscillator_is_running/0,
+		 oscillator_is_started/0,
 		 oscillator_start/0, 
-		 oscillator_stop/0]).
+		 oscillator_stop/0,
+		 oscillator_status_change_subscribe/0, oscillator_status_change_subscribe/1,
+		 oscillator_status_change_unsubscribe/1]).
 
 %% ====================================================================
 %% RTC Date And Time related functions
@@ -137,6 +138,7 @@
 %% Oscillator related functions
 %% ====================================================================
 		 do_oscillator_is_running/0,
+		 do_oscillator_is_started/0,
 		 do_oscillator_start/0,
 		 do_oscillator_stop/0,
 		 
@@ -167,12 +169,19 @@
 
 -export([hour_convert_to_12h_format/1, hour_convert_to_24h_format/2]).
 
--define(PWR_STATUS_CHECK_INTERVAL,	1000).	%% Time interval in [msec], for check PWR status.
+-define(PWR_STATUS_CHECK_INTERVAL,			1000).	%% Time interval in [msec], for check PWR status.
+-define(OSCILLATOR_STATUS_CHECK_INTERVAL,	1000).	%% Time interval in [msec], for check OSCILLATOR status.
+
 -record(state, {
 				pwrStatusNotificationPidList = [],	%% List of pids, who has been ordered for notifications.
 				pwrStatusCheckIntervalTref,			%% Timer reference for the timer to trigger PWR checking periodicaly.
-				pwrStatusLastCheckTime,				%% The time of last checking time of PWR status. It is erlang:now().
-				pwrStatus							%% rtc_pwrfail()
+				pwrStatusLastCheckTime,				%% The last check time of PWR status. It is erlang:now().
+				pwrStatus,							%% rtc_pwrfail()
+				
+				oscStatusNotificationPidList = [],	%% List of pids, who has been ordered for notifications.
+				oscStatusCheckIntervalTref,			%% Timer reference for the timer to trigger OSCILLATOR checking periodicaly.
+				oscStatusLastCheckTime,				%% The last check time of OSCILLATOR status. It is erlang:now().
+				oscStatus							%% rtc_oscrun()
 				}).
 
 %% ====================================================================
@@ -187,7 +196,7 @@ start(TimeFormat, VBatEn) ->
 			%% Already started
 			{ok, Pid};
 		_->	%% The supervisor does not started yet.
-			gen_server:start({local, ?SERVER}, ?MODULE, [TimeFormat, VBatEn], [{timeout, 1000}]) 
+			gen_server:start({local, ?SERVER}, ?MODULE, [TimeFormat, VBatEn], [{timeout, 5000}]) 
 	end.
 
 %% ====================================================================
@@ -417,6 +426,15 @@ oscillator_is_running() ->
 
 %% ====================================================================
 %% @doc
+%% Read ST bit- This tells that oscillator is started or not.
+%% @end
+-spec oscillator_is_started() -> {ok, rtc_osc_start()} | {error, term()}.
+%% ====================================================================
+oscillator_is_started() ->
+	do_gen_server_call({execute_mfa, {?MODULE, do_oscillator_is_started,[]}}).
+
+%% ====================================================================
+%% @doc
 %% Start Oscillator.
 %% @end
 -spec oscillator_start() -> ok | {error, term()}.
@@ -432,6 +450,33 @@ oscillator_start() ->
 %% ====================================================================
 oscillator_stop() ->
 	do_gen_server_call({execute_mfa, {?MODULE, do_oscillator_stop,[]}}).
+
+%% ====================================================================
+%% @doc
+%% Subscribe to OSCILLATOR status change events.
+%% @end
+-spec oscillator_status_change_subscribe() -> ok | {error, term()}.
+%% ====================================================================
+oscillator_status_change_subscribe() ->
+	oscillator_status_change_subscribe(self()).
+
+%% ====================================================================
+%% @doc
+%% Subscribe to OSCILLATOR status change events.
+%% @end
+-spec oscillator_status_change_subscribe(pid()) -> ok | {error, term()}.
+%% ====================================================================
+oscillator_status_change_subscribe(PidToSendNotification) ->
+	do_gen_server_call({oscillator_status_change_subscribe, PidToSendNotification}).
+
+%% ====================================================================
+%% @doc
+%% Unsubscribe to OSCILLATOR status change events.
+%% @end
+-spec oscillator_status_change_unsubscribe(pid()) -> ok | {error, term()}.
+%% ====================================================================
+oscillator_status_change_unsubscribe(PidToSendNotification) ->
+	do_gen_server_call({oscillator_status_change_unsubscribe, PidToSendNotification}).
 
 %% ====================================================================
 %% @doc
@@ -522,22 +567,11 @@ init([TimeFormat, Vbaten]) ->
 					ok
 			end,
 			
-			%% Clear interrupt flags.
-			do_alarm_interrupt_flag_clear(?RTC_ALARM_0_ID),
-			do_alarm_interrupt_flag_clear(?RTC_ALARM_1_ID),
-			
-			%% Disable interrupt for both alarms.
-			do_alarm_interrupt_disable(?RTC_ALARM_0_ID),
-			do_alarm_interrupt_disable(?RTC_ALARM_1_ID),
-			
-			%% Start RTC oscillator
-			do_oscillator_start(),
-			
-			{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+			do_init(),
 			
 			?DO_INFO("RTC has been started", []),
 			
-			{ok, #state{pwrStatusCheckIntervalTref = TRef}};
+			{ok, #state{}};
 		
 		{ok, ?RTC_WKDAY_BIT_VBATEN_DIS} ->
 			%% Configure the current Date and Time anyway.
@@ -572,25 +606,38 @@ init([TimeFormat, Vbaten]) ->
 			%% Configure VBATEN
 			do_vbaten_set(Vbaten),
 			
-			%% Clear interrupt flags.
-			do_alarm_interrupt_flag_clear(?RTC_ALARM_0_ID),
-			do_alarm_interrupt_flag_clear(?RTC_ALARM_1_ID),
-			
-			%% Disable interrupt for both alarms.
-			do_alarm_interrupt_disable(?RTC_ALARM_0_ID),
-			do_alarm_interrupt_disable(?RTC_ALARM_1_ID),
-			
-			%% Start RTC oscillator
-			do_oscillator_start(),
-			
-			{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+			do_init(),
 			
 			?DO_INFO("RTC has been started", []),
-			{ok, #state{pwrStatusCheckIntervalTref = TRef}};
+			{ok, #state{}};
 		
 		ER ->
 			?DO_ERR("Faild to do_init RTC device.", [{reason, ER}]),
 			{stop, ER}
+	end.
+
+do_init() ->
+	%% Clear interrupt flags.
+	do_alarm_interrupt_flag_clear(?RTC_ALARM_0_ID),
+	do_alarm_interrupt_flag_clear(?RTC_ALARM_1_ID),
+	
+	%% Disable interrupt for both alarms.
+	do_alarm_interrupt_disable(?RTC_ALARM_0_ID),
+	do_alarm_interrupt_disable(?RTC_ALARM_1_ID),
+	
+	%% Start RTC oscillator
+	do_oscillator_start(),
+	
+	%% Stay in the loop until oscillator is not running.
+	do_init_loop().
+
+do_init_loop() ->
+	%% Check OSCRUN bit in a loop, and exit when it is SET
+	case do_oscillator_is_running() of
+		{ok, ?RTC_WKDAY_BIT_OSCRUN_EN} ->
+			ok;
+		_->	%% Oscillator is NOT yet running, stay in the loop.
+			do_init_loop()
 	end.
 
 %% handle_call/3
@@ -623,22 +670,99 @@ handle_call({pwr_status_change_subscribe, PidToSendNotification}, _From, State) 
 		false ->
 			%% Insert Pid into the list
 			?DO_INFO("Pid has been subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
-			{reply, ok, State#state {pwrStatusNotificationPidList = lists:append(State#state.pwrStatusNotificationPidList, [PidToSendNotification])}}
+			
+			NewPwrStatusNotificationPidList = lists:append(State#state.pwrStatusNotificationPidList, [PidToSendNotification]),
+			
+			%% Start timer for periodic check, if not yet started.
+			case State#state.pwrStatusCheckIntervalTref of
+				undefined ->
+					%% Timer does not started. Do it.
+					{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+					
+					{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList,
+											 pwrStatusCheckIntervalTref = TRef}};
+				_->
+					%% Timer already started.
+					{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList}}
+			end
 	end;
 
 handle_call({pwr_status_change_unsubscribe, PidToSendNotification}, _From, State) ->
 	case lists:member(PidToSendNotification, State#state.pwrStatusNotificationPidList) of
 		true ->
 			?DO_INFO("Pid has been unsubscribed to the PWR change notification", [{pid, PidToSendNotification}]),
-			{reply, ok, State#state {pwrStatusNotificationPidList = lists:delete(PidToSendNotification, State#state.pwrStatusNotificationPidList)}};
+			
+			NewPwrStatusNotificationPidList = lists:delete(PidToSendNotification, State#state.pwrStatusNotificationPidList),
+			
+			%% Cancel timer if pidlist is empty.
+			case NewPwrStatusNotificationPidList of
+				[] ->
+					timer:cancel(State#state.pwrStatusCheckIntervalTref),
+					{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList,
+											 pwrStatusCheckIntervalTref = undefined}};
+				
+				_->	{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList}}
+			end;
+		false ->
+			?DO_ERR("Pid does not subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
+			{reply, {error, {pid_does_not_subscribed_to_pwr_change_notification, PidToSendNotification}}, State}
+	end;
+
+handle_call({oscillator_status_change_subscribe, PidToSendNotification}, _From, State) ->
+	%% Check that PidToSendNotification is in the list or not.
+	case lists:member(PidToSendNotification, State#state.oscStatusNotificationPidList) of
+		true ->
+			%% Pid is already subscribed to the OSCILLATOR change notification.
+			?DO_ERR("Pid is already subscribed to the OSCILLATOR change notification", [{pid, PidToSendNotification}]),
+			{reply, {error, {pid_already_subscribed_to_oscillator_change_notification, PidToSendNotification}}, State};
+		false ->
+			%% Insert Pid into the list
+			?DO_INFO("Pid has been subscribed to the OSCILLATOR change notification", [{pid, PidToSendNotification}]),
+			
+			NewOscStatusNotificationPidList = lists:append(State#state.oscStatusNotificationPidList, [PidToSendNotification]),
+			
+			%% Start timer for periodic check, if not yet started.
+			case State#state.oscStatusCheckIntervalTref of
+				undefined ->
+					%% Timer does not started. Do it.
+					{ok, TRef} = timer:send_interval(?OSCILLATOR_STATUS_CHECK_INTERVAL, self(), {oscillator_status_check}),
+					
+					{reply, ok, State#state {oscStatusNotificationPidList = NewOscStatusNotificationPidList,
+											 oscStatusCheckIntervalTref = TRef}};
+				_->
+					%% Timer already started.
+					{reply, ok, State#state {oscStatusNotificationPidList = NewOscStatusNotificationPidList}}
+			end
+	end;
+
+handle_call({oscillator_status_change_unsubscribe, PidToSendNotification}, _From, State) ->
+	case lists:member(PidToSendNotification, State#state.oscStatusNotificationPidList) of
+		true ->
+			?DO_INFO("Pid has been unsubscribed to the PWR change notification", [{pid, PidToSendNotification}]),
+			
+			NewOscStatusNotificationPidList = lists:delete(PidToSendNotification, State#state.oscStatusNotificationPidList),
+			
+			%% Cancel timer if pidlist is empty.
+			case NewOscStatusNotificationPidList of
+				[] ->
+					timer:cancel(State#state.oscStatusCheckIntervalTref),
+					{reply, ok, State#state {oscStatusNotificationPidList = NewOscStatusNotificationPidList,
+											 oscStatusCheckIntervalTref = undefined}};
+				
+				_->	{reply, ok, State#state {oscStatusNotificationPidList = NewOscStatusNotificationPidList}}
+			end;
 		false ->
 			?DO_ERR("Pid does not subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
 			{reply, {error, {pid_does_not_subscribed_to_pwr_change_notification, PidToSendNotification}}, State}
 	end;
 
 handle_call({stop}, _From, State) ->
-	%% Stop timer
-	timer:cancel(State#state.pwrStatusCheckIntervalTref),
+	case State#state.pwrStatusCheckIntervalTref of
+		undefined ->
+			ok;
+		_->	%% Stop timer
+			timer:cancel(State#state.pwrStatusCheckIntervalTref)
+	end,
 	
 	%% Stop gen_server
 	{stop, normal, ok, State#state{pwrStatusCheckIntervalTref = undefined}};
@@ -759,6 +883,96 @@ handle_info({pwr_status_check}, State) ->
 										   pwrStatusLastCheckTime = erlang:now()},
 					{noreply, NewState}
 			end
+	end;
+
+handle_info({oscillator_status_check}, State) ->
+	%% Do check OSCRUN bit and send notification if its state has been changes since last check.
+	case do_oscillator_is_running() of
+		{ok, ?RTC_WKDAY_BIT_OSCRUN_EN} ->
+			%% Compare the new value to the latest known value.
+			case State#state.oscStatus of
+				undefined ->
+					%% Initial value, change the notification anyway.
+					
+					?DO_INFO("RTC oscillator is running", []),
+					
+					[begin
+						 Pid ! {?NOTIFICATION_OSCILLATOR_IS_RUNNING} 
+					 end || Pid <- State#state.oscStatusNotificationPidList],
+					
+					{noreply, State#state{oscStatus = ?RTC_WKDAY_BIT_OSCRUN_EN,
+										  oscStatusLastCheckTime = erlang:now()}};
+				?RTC_WKDAY_BIT_OSCRUN_EN ->
+					%% OSCILLATOR status has not changed. Do nothing.
+					{noreply, State#state{oscStatusLastCheckTime = erlang:now()}};
+				
+				?RTC_WKDAY_BIT_OSCRUN_DIS ->
+					%% OSCILLATOR status has been changed. Do send notification.
+					
+					?DO_INFO("RTC oscillator is running", []),
+					
+					[begin
+						 Pid ! {?NOTIFICATION_OSCILLATOR_IS_RUNNING}
+					 end || Pid <- State#state.oscStatusNotificationPidList],
+					
+					{noreply, State#state{oscStatus = ?RTC_WKDAY_BIT_OSCRUN_EN,
+										  oscStatusLastCheckTime = erlang:now()}}
+			end;
+			
+		{ok, ?RTC_WKDAY_BIT_OSCRUN_DIS} ->
+			%% Compare the new value to the latest known value.
+			case State#state.oscStatus of
+				undefined ->
+					%% Initial value, change the notification anyway.
+					
+					?DO_ERR("RTC oscillator is not running", []),
+					
+					ReasonInfo = case do_oscillator_is_started() of
+									 {ok, ?RTC_WKDAY_BIT_OSCRUN_EN} ->
+										 {'ST bit', {?RTC_WKDAY_BIT_OSCRUN_EN, osc_started}};
+									 {ok, ?RTC_WKDAY_BIT_OSCRUN_DIS} ->
+										 {'ST bit', {?RTC_WKDAY_BIT_OSCRUN_DIS, osc_not_started}};
+									 ER ->
+										 {'ST bit', {unexpected_error, ER}}
+								 end,
+					
+					[begin
+						 Pid ! ?NOTIFICATION_OSCILLATOR_IS_NOT_RUNNING(ReasonInfo)
+					 end || Pid <- State#state.oscStatusNotificationPidList],
+					
+					{noreply, State#state{oscStatus = ?RTC_WKDAY_BIT_OSCRUN_DIS,
+										  oscStatusLastCheckTime = erlang:now()}};
+				?RTC_WKDAY_BIT_OSCRUN_EN ->
+					%% OSCILLATOR status has been changed. Do send notification.
+					
+					?DO_ERR("RTC oscillator is not running", []),
+					
+					ReasonInfo = case do_oscillator_is_started() of
+									 {ok, ?RTC_WKDAY_BIT_OSCRUN_EN} ->
+										 {'ST bit', {?RTC_WKDAY_BIT_OSCRUN_EN, osc_started}};
+									 {ok, ?RTC_WKDAY_BIT_OSCRUN_DIS} ->
+										 {'ST bit', {?RTC_WKDAY_BIT_OSCRUN_DIS, osc_not_started}};
+									 ER ->
+										 {'ST bit', {unexpected_error, ER}}
+								 end,
+					
+					[begin
+						 Msg = ?NOTIFICATION_OSCILLATOR_IS_NOT_RUNNING(ReasonInfo),
+%% 						 ?DO_INFO("RTC oscillator is not running. Send notification to pid.", [{pid, Pid},
+%% 																							   {msg, Msg}]),
+						 Pid ! Msg
+					 end || Pid <- State#state.oscStatusNotificationPidList],
+					
+					{noreply, State#state{oscStatus = ?RTC_WKDAY_BIT_OSCRUN_DIS,
+										  oscStatusLastCheckTime = erlang:now()}};
+				
+				?RTC_WKDAY_BIT_OSCRUN_DIS ->
+					%% OSCILLATOR status has been changed. Do nothing.
+					{noreply, State#state{oscStatusLastCheckTime = erlang:now()}}
+			end;
+		ER->
+			?DO_ERR("Unexpected error when check RTC oscillator.", [{reason, ER}]),
+			{noreply, State#state{oscStatusLastCheckTime = erlang:now()}}
 	end;
 	
 handle_info(_Info, State) ->
@@ -1415,6 +1629,20 @@ do_oscillator_is_running() ->
 	case bitfield_get(#rtcWkDayReg{}, {addrIdx, #rtcWkDayReg.address}, #rtcWkDayReg.bit_oscRun) of
 		[{#rtcWkDayReg.bit_oscRun, Oscrun}] ->
 			{ok, Oscrun};
+		ER ->
+			ER
+	end.
+
+%% ====================================================================
+%% @doc
+%% Read ST bit- This tells that oscillator is strted or not.
+%% @end
+-spec do_oscillator_is_started() -> {ok, rtc_osc_start()} | {error, term()}.
+%% ====================================================================
+do_oscillator_is_started() ->
+	case bitfield_get(#rtcSecondReg{}, {addrIdx, #rtcSecondReg.address}, #rtcSecondReg.bit_st) of
+		[{#rtcSecondReg.bit_st, ST}] ->
+			{ok, ST};
 		ER ->
 			ER
 	end.
