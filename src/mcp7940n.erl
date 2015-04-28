@@ -21,6 +21,7 @@
 %% ====================================================================
 -define(SERVER, ?MODULE).
 -define(TIMEOUT, 1000).
+-define(TIME_TO_WAIT_BEFORE_CHECK_OSCILLATOR_STATUS, 500).
 -define(DO_ERR(TEXT,TUPPLELIST), error_logger:error_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
 -define(DO_INFO(TEXT,TUPPLELIST), error_logger:info_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
 
@@ -627,6 +628,9 @@ do_init() ->
 	
 	%% Start RTC oscillator
 	do_oscillator_start(),
+	
+	%% Wait x msec after start oscillator, but before check its status.
+	timer:sleep(?TIME_TO_WAIT_BEFORE_CHECK_OSCILLATOR_STATUS),
 	
 	%% Stay in the loop until oscillator is not running.
 	do_init_loop().
