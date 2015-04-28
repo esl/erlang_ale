@@ -1,5 +1,7 @@
 # Erlang/ALE -- Erlang Actor Library for Embedded
 
+[![Build Status](https://travis-ci.org/esl/erlang_ale.svg)](https://travis-ci.org/esl/erlang_ale)
+
 Erlang/ALE provides high level abstractions for interfacing to hardware
 peripherals through I2C, SPI, and GPIOs on embedded platforms.
 
