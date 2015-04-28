@@ -11,10 +11,12 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start/0, 
+-export([start/0,
 		 stop/0, 
 		 pwr_status_change_subscribe/0, 
 		 pwr_status_change_unsubscribe/0,
+		 osc_status_change_subscribe/0,
+		 osc_status_change_unsubscribe/0,
 		 alarm_configure/0]).
 
 %% ====================================================================
@@ -24,6 +26,7 @@
 -define(INT_PIN, 17).			%% This GPIO will recevies the interrupt from the RTC.
 -define(INT_CONDITION, rising).
 -define(ALARM_MODULE, ?RTC_ALARM_0_ID).
+-define(GENERAL_GENSERVER_TIMEOUT, 10000).
 
 %% ====================================================================
 %% Includes
@@ -47,7 +50,7 @@ start() ->
 		P when is_pid(P) ->
 			{ok, P};
 		_->
-			gen_server:start({local, ?SERVER}, ?MODULE, [], [{timeout, 1000}])
+			gen_server:start({local, ?SERVER}, ?MODULE, [], [{timeout, ?GENERAL_GENSERVER_TIMEOUT}])
 	end.
 
 %% ====================================================================
@@ -98,6 +101,36 @@ pwr_status_change_unsubscribe() ->
 
 %% ====================================================================
 %% @doc
+%% Subscribe to OSCILLATOR change events.
+%% @end
+-spec osc_status_change_subscribe() -> ok | {error, term()}.
+%% ====================================================================
+osc_status_change_subscribe() ->
+	case whereis(?SERVER) of
+		Pid when is_pid(Pid) ->
+			gen_server:call(Pid, {osc_status_change_subscribe}, infinity);
+		
+		ER->%% Process is not running.
+			{error, ER}
+	end.
+
+%% ====================================================================
+%% @doc
+%% Unsubscribe to OSCILLATOR change events.
+%% @end
+-spec osc_status_change_unsubscribe() -> ok | {error, term()}.
+%% ====================================================================
+osc_status_change_unsubscribe() ->
+	case whereis(?SERVER) of
+		Pid when is_pid(Pid) ->
+			gen_server:call(Pid, {osc_status_change_unsubscribe}, infinity);
+		
+		ER->%% Process is not running.
+			{error, ER}
+	end.
+
+%% ====================================================================
+%% @doc
 %% Configure Alarm-0 module with the following conditions:
 %%		alarm time			: localtime+1 min
 %%		alarm mask			: full match (Sec,Min,Hour,Day of week, Date and Month)
@@ -128,9 +161,11 @@ alarm_configure() ->
 init([]) ->
 	case mcp7940n:start(?RTC_HOUR_BIT_TIME_FORMAT_24H, ?RTC_WKDAY_BIT_VBATEN_EN) of
 		{ok,_Pid} ->
-			%% Configure INT_PIN for input to able to receive interrupts from RTC.
-			Result = ale_handler:gpio_set_int(?INT_PIN, ?INT_CONDITION, self()),
-			error_logger:info_report([string:concat(string:concat("INT_PIN (GPIO-", erlang:integer_to_list(?INT_PIN)), ") and interrupt conditions have been configured"), {result, Result}]),
+ 			%% Configure INT_PIN for input to able to receive interrupts from RTC.
+ 			Result = ale_handler:gpio_set_int(?INT_PIN, ?INT_CONDITION, self()),
+			
+			error_logger:info_report([string:concat(string:concat("INT_PIN (GPIO-", erlang:integer_to_list(?INT_PIN)), ") and interrupt conditions have been configured"), 
+									  {result, Result}]),
 			
     		{ok, #state{}};
 		{error, ER} ->
@@ -164,6 +199,14 @@ handle_call({pwr_status_change_subscribe}, _From, State) ->
 
 handle_call({pwr_status_change_unsubscribe}, _From, State) ->
 	Reply = mcp7940n:pwr_status_change_unsubscribe(),
+	{reply, Reply, State};
+
+handle_call({osc_status_change_subscribe}, _From, State) ->
+	Reply = mcp7940n:oscillator_status_change_subscribe(),
+	{reply, Reply, State};
+
+handle_call({osc_status_change_unsubscribe}, _From, State) ->
+	Reply = mcp7940n:oscillator_status_change_unsubscribe(),
 	{reply, Reply, State};
 
 handle_call({alarm_configure}, _From, State) ->
@@ -224,7 +267,10 @@ handle_info({gpio_interrupt, Pin, Condition},State) ->
 									   {interrupt_condition, Condition},
 									   {expectedAlarmModule, ?ALARM_MODULE},
 									   {expectedAlarmFlag,?RTC_ALMxWKDAY_BIT_ALMxIF_SET},
-									   {readAlarmFlag, AlarmFlag}]);
+									   {readAlarmFlag, AlarmFlag},
+									   {intGpioLogicalStatus, ale_handler:gpio_read(?INT_PIN)},
+									   {'ALM0-IF', mcp7940n:alarm_interrupt_flag_check(?RTC_ALARM_0_ID)},
+									   {'ALM1-IF', mcp7940n:alarm_interrupt_flag_check(?RTC_ALARM_1_ID)}]);
 		ER->
 			error_logger:error_report(["Unexpected interrupt has been occured on a NOT used Alarm module.", 
 									   {gpio, Pin}, 
@@ -234,7 +280,16 @@ handle_info({gpio_interrupt, Pin, Condition},State) ->
 	end,
 	{noreply, State};
 
-handle_info(_Info, State) ->
+handle_info({oscillator_is_running}, State) ->
+	error_logger:info_report("RTC oscillator is running"),
+	{noreply, State};
+
+handle_info({oscillator_is_not_running, Info}, State) ->
+	error_logger:error_report(["RTC oscillator is not running", {info, Info}]),
+	{noreply, State};
+
+handle_info(Info, State) ->
+	error_logger:info_report(["Unexpected message has been received", {msg, Info}, {state, State}]),
     {noreply, State}.
 
 
