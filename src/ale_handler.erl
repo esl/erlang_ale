@@ -14,22 +14,16 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %%===================================================================
-%% Include ALE type definitions
+%% Includes
 %%===================================================================
 -include("ale_type_def.hrl").
+-include("ale_common.hrl").
 
 %%===================================================================
 %% Defines
 %%===================================================================
 -define(SERVER, ?MODULE).
 -define(TIMEOUT_FOR_OPERATION, 10000).
-
--define(DRV_GPIO_MODULE, gpio).
--define(DRV_I2C_MODULE, i2c).
--define(DRV_SPI_MODULE, spi).
-
--define(START_FUNC_DRV_MODULE, start).
--define(STOP_FUNC_DRV_MODULE, stop).
 
 -record(rALEHandler, {
 					  key,			%% tuple, {gpio, pin(), pin_direction()} | {i2c, devname(), addr()} | {spi, list()}

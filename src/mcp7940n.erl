@@ -22,8 +22,6 @@
 -define(SERVER, ?MODULE).
 -define(TIMEOUT, 1000).
 -define(TIME_TO_WAIT_BEFORE_CHECK_OSCILLATOR_STATUS, 500).
--define(DO_ERR(TEXT,TUPPLELIST), error_logger:error_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
--define(DO_INFO(TEXT,TUPPLELIST), error_logger:info_report(lists:append([TEXT], lists:append(TUPPLELIST,[{module, ?MODULE}, {line, ?LINE}])))).
 
 %% ====================================================================
 %% API functions
