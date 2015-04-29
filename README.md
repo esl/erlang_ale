@@ -7,13 +7,19 @@ peripherals through I2C, SPI, and GPIOs on embedded platforms.
 
 # Getting started
 
-If you're natively compiling Erlang/ALE, everything should work like any other
+Erlang/ALE supports both rebar3 and erlang.mk build tools. If you're natively compiling Erlang/ALE, everything should work like any other
 Erlang library. Normally, you would include `erlang_ale` as a dependency in your
-`rebar.config` or similar file. If you just want to try it out, do the following:
+`rebar.config` or Makefile file. If you just want to try it out, do the following:
 
     git clone https://github.com/esl/erlang_ale.git
-    rebar3 compile
-    rebar3 shell
+    
+    Steps for rebar3 build tool:
+    	rebar3 compile
+    	rebar3 shell
+    
+    Steps for erlang.mk build tool:
+    	make
+    	make shell
 
 If you're cross-compiling, you'll need to setup your environment so that the
 right C compiler is called. See the `Makefile` for the variables that will need
