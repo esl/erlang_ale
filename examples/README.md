@@ -31,69 +31,70 @@ Step-by-step:
 
 Start test application when rising interrupt edge will generates interrupt by ale_handler_gpio_int_test:start_link/0
 	
-	5> ale_handler_gpio_int_test:start_link().
-	=INFO REPORT==== 22-Apr-2015::05:55:19 ===
+	26> ale_handler_gpio_int_test:start_link().
+	
+	=INFO REPORT==== 30-Apr-2015::18:43:49 ===
 	    "ALE driver process has been started and registered successfully."
+	    initialMFA: {ale_handler,gpio_set_int,[27,rising,<0.83.0>]}
 	    drvModule: gpio
-	    drvStartFunction: start
+	    drvStartFunction: start_link
 	    drvStartArgs: [27,input]
-	    drvPid: <0.46.0>
-	    monitorRef: #Ref<0.0.0.62>
-	{ok,<0.44.0>}
+	    drvPid: <0.86.0>
+	    module: ale_handler
+	    line: 733
+	{ok,<0.83.0>}
+	27>
 	
-Simulate button press event by 
-	ale_handler_gpio_int_test:press_btn/0
+Simulate release press event by ale_handler_gpio_int_test:release_btn/0
 	
-	8> ale_handler_gpio_int_test:press_btn().
-	=INFO REPORT==== 22-Apr-2015::05:55:51 ===
-	    "ALE driver process has been started and registered successfully."
-	    drvModule: gpio
-	    drvStartFunction: start
-	    drvStartArgs: [22,output]
-	    drvPid: <0.50.0>
-	    monitorRef: #Ref<0.0.0.83>
-	ok
-	9>
+	27> ale_handler_gpio_int_test:release_btn().
+
+Simulate press press event by ale_handler_gpio_int_test:press_btn/0
 Rising interrupt event has been received by test application from driver:
 
-	=INFO REPORT==== 22-Apr-2015::05:55:51 ===
+	29> ale_handler_gpio_int_test:press_btn().
+	
+	=INFO REPORT==== 30-Apr-2015::18:46:16 ===
 	    "Interrupt has been occurred."
 	    gpio: 27
 	    interrupt_condition: rising
+	ok
+	30>
+
 
 Release the button by ale_handler_gpio_int_test:release_btn/0. No interrupt event should be received by test application at this time.
 	
-	9> ale_handler_gpio_int_test:release_btn().
+	30> ale_handler_gpio_int_test:release_btn().
 	ok
-	10>
+	31>
 	
 Press the button again and see, rising interrupt has been received again:
 
-	10> ale_handler_gpio_int_test:press_btn().
+	31> ale_handler_gpio_int_test:press_btn().
 	
-	=INFO REPORT==== 22-Apr-2015::05:56:24 ===
+	=INFO REPORT==== 30-Apr-2015::18:46:58 ===
 	    "Interrupt has been occurred."
 	    gpio: 27
 	    interrupt_condition: rising
 	ok
+	32>
 
 Change the interrupt condition to falling edge.
 
-	11> ale_handler_gpio_int_test:set_int_condition(falling).
+	32> ale_handler_gpio_int_test:set_int_condition(falling).
 	ok
+	33>
 
 Release the pressed button. Falling interrupt event should be received by the test application:
 
-	12> ale_handler_gpio_int_test:press_btn().
-	ok
-	12> ale_handler_gpio_int_test:release_btn().
+	33> ale_handler_gpio_int_test:release_btn().
 	
-	=INFO REPORT==== 22-Apr-2015::05:56:42 ===
+	=INFO REPORT==== 30-Apr-2015::18:47:39 ===
 	    "Interrupt has been occurred."
 	    gpio: 27
 	    interrupt_condition: falling
 	ok
-	13>
+	34>
 
 # ex_mcp23x17:start_i2c_blinking_led/4
 
@@ -122,29 +123,68 @@ Here is the schematic about circuit:
 		
 		Start blinking LED:
 		-------------------
-		3> ex_mcp23x17:start_i2c_blinking_led(16#20, 'A', 0, 200).
+		23> ex_mcp23x17:stop_spi_blinking_led(32, 'A', 0).
 		
-		=INFO REPORT==== 10-Apr-2015::12:21:46 ===
-		    "ALE driver process has been started and registered successfully."
-		    drvModule: i2c
-		    drvStartFunction: start
-		    drvStartArgs: ["i2c-1",32]
-		    drvPid: <0.44.0>
-		    monitorRef: #Ref<0.0.0.1550>
+		=INFO REPORT==== 30-Apr-2015::18:40:53 ===
+		    "Processis going to be stopped."
+		    processName: spi_32_A_0
+		    module: ex_mcp23x17
+		    line: 110
+		
+		=INFO REPORT==== 30-Apr-2015::18:40:53 ===
+		    "ALE driver has been released."
+		    drvPid: <0.75.0>
+		    initialMFA: {ale_handler,spi_transfer,["spidev0.0",[],<<65,20,0>>]}
+		    drvInitMFA: {spi,start_link,["spidev0.0",[]]}
+		    module: ale_handler
+		    line: 790
+		
+		=INFO REPORT==== 30-Apr-2015::18:40:53 ===
+		    "ALE driver has been released."
+		    drvPid: <0.73.0>
+		    initialMFA: {ale_handler,i2c_write,["i2c-1",32,<<20>>]}
+		    drvInitMFA: {i2c,start_link,["i2c-1",32]}
+		    module: ale_handler
+		    line: 790
 		ok
 		
 		Stop blinking LED:
 		------------------
-		4> ex_mcp23x17:stop_i2c_blinking_led().
+		24> ex_mcp23x17:start_i2c_blinking_led(16#20, 'A', 0, 200).
 		
-		=INFO REPORT==== 10-Apr-2015::12:21:57 ===
-		    "ALE driver has been released."
-		    drvPid: <0.44.0>
-		    record_in_ets: {rALEHandler,{i2c,"i2c-1",32},
-		                                {ale_handler,i2c_write,["i2c-1",32,<<0>>]},
-		                                <0.44.0>,#Ref<0.0.0.1550>}
+		=INFO REPORT==== 30-Apr-2015::18:41:24 ===
+		    "ALE driver process has been started and registered successfully."
+		    initialMFA: {ale_handler,i2c_write,["i2c-1",32,<<0>>]}
+		    drvModule: i2c
+		    drvStartFunction: start_link
+		    drvStartArgs: ["i2c-1",32]
+		    drvPid: <0.80.0>
+		    module: ale_handler
+		    line: 733
+		
+		=INFO REPORT==== 30-Apr-2015::18:41:24 ===
+		    "Process has been started."
+		    processName: i2c_32_A_0
+		    module: ex_mcp23x17
+		    line: 56
 		ok
-		5>
+		25> ex_mcp23x17:stop_i2c_blinking_led(16#20, 'A', 0).
+		
+		=INFO REPORT==== 30-Apr-2015::18:41:39 ===
+		    "Process is going to be stopped."
+		    processName: i2c_32_A_0
+		    module: ex_mcp23x17
+		    line: 72
+		
+		=INFO REPORT==== 30-Apr-2015::18:41:39 ===
+		    "ALE driver has been released."
+		    drvPid: <0.80.0>
+		    initialMFA: {ale_handler,i2c_write,["i2c-1",32,<<0>>]}
+		    drvInitMFA: {i2c,start_link,["i2c-1",32]}
+		    module: ale_handler
+		    line: 790
+		ok
+		26>
 
 # ex_mcp23x17:start_spi_blinking_led/4
 
@@ -182,45 +222,63 @@ Here is the schematic about the circuit:
 		
 		Start blinking LED:
 		-------------------
-		1> ex_mcp23x17:start_spi_blinking_led(32, 'A', 0, 200).
+		21> ex_mcp23x17:start_spi_blinking_led(32, 'A', 0, 200).
 		
-		=INFO REPORT==== 10-Apr-2015::12:20:06 ===
+		=INFO REPORT==== 30-Apr-2015::18:39:10 ===
 		    "ALE driver process has been started and registered successfully."
+		    initialMFA: {ale_handler,i2c_write,["i2c-1",32,<<0>>]}
 		    drvModule: i2c
-		    drvStartFunction: start
+		    drvStartFunction: start_link
 		    drvStartArgs: ["i2c-1",32]
-		    drvPid: <0.38.0>
-		    monitorRef: #Ref<0.0.0.35>
+		    drvPid: <0.64.0>
+		    module: ale_handler
+		    line: 733
 		
-		=INFO REPORT==== 10-Apr-2015::12:20:06 ===
+		=INFO REPORT==== 30-Apr-2015::18:39:10 ===
 		    "ALE driver process has been started and registered successfully."
+		    initialMFA: {ale_handler,spi_transfer,["spidev0.0",[],<<65,0,0>>]}
 		    drvModule: spi
-		    drvStartFunction: start
+		    drvStartFunction: start_link
 		    drvStartArgs: ["spidev0.0",[]]
-		    drvPid: <0.39.0>
-		    monitorRef: #Ref<0.0.0.51>
+		    drvPid: <0.66.0>
+		    module: ale_handler
+		    line: 733
+		
+		=INFO REPORT==== 30-Apr-2015::18:39:10 ===
+		    "Process has been started."
+		    processName: spi_32_A_0
+		    module: ex_mcp23x17
+		    line: 94
 		ok
+
 		
 		Stop blinking LED:
 		-------------------
-		2> ex_mcp23x17:stop_spi_blinking_led().
+		23> ex_mcp23x17:stop_spi_blinking_led(32, 'A', 0).
 		
-		=INFO REPORT==== 10-Apr-2015::12:20:15 ===
-		    "ALE driver has been released."
-		    drvPid: <0.39.0>
-		    record_in_ets: {rALEHandler,
-		                       {spi,"spidev0.0",[]},
-		                       {ale_handler,spi_transfer,["spidev0.0",[],<<65,0,0>>]},
-		                       <0.39.0>,#Ref<0.0.0.51>}
+		=INFO REPORT==== 30-Apr-2015::18:40:53 ===
+		    "Processis going to be stopped."
+		    processName: spi_32_A_0
+		    module: ex_mcp23x17
+		    line: 110
 		
-		=INFO REPORT==== 10-Apr-2015::12:20:15 ===
+		=INFO REPORT==== 30-Apr-2015::18:40:53 ===
 		    "ALE driver has been released."
-		    drvPid: <0.38.0>
-		    record_in_ets: {rALEHandler,{i2c,"i2c-1",32},
-		                                {ale_handler,i2c_write,["i2c-1",32,<<0>>]},
-		                                <0.38.0>,#Ref<0.0.0.35>}
+		    drvPid: <0.75.0>
+		    initialMFA: {ale_handler,spi_transfer,["spidev0.0",[],<<65,20,0>>]}
+		    drvInitMFA: {spi,start_link,["spidev0.0",[]]}
+		    module: ale_handler
+		    line: 790
+		
+		=INFO REPORT==== 30-Apr-2015::18:40:53 ===
+		    "ALE driver has been released."
+		    drvPid: <0.73.0>
+		    initialMFA: {ale_handler,i2c_write,["i2c-1",32,<<20>>]}
+		    drvInitMFA: {i2c,start_link,["i2c-1",32]}
+		    module: ale_handler
+		    line: 790
 		ok
-		3>
+
 
 # ex_mcp7940n - Configure Date&Time and Alarm in RTC device
 This example introduces how to configure Date&Time in MCP7940n RTC device and it also shows how easy to configure alarm module for a specific Date&Time.
