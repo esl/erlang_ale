@@ -11,8 +11,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2, start_link/2,
-         start/3, start_link/3,
+-export([start_link/2,
+         start_link/3,
          stop/1,
          write/2,
          read/1,
@@ -50,19 +50,10 @@
 %% @doc
 %% Starts a process to handle a GPIO.
 %% @end
--spec start(term(), pin(), pin_direction()) ->
-                    {'ok', pid()} | 'ignore' | {'error', term()}.
-start(ServerName, Pin, Direction) ->
-  gen_server:start(ServerName, ?MODULE, {Pin, Direction}, []).
-
 -spec start_link(term(), pin(), pin_direction()) ->
                     {'ok', pid()} | 'ignore' | {'error', term()}.
 start_link(ServerName, Pin, Direction) ->
   gen_server:start_link(ServerName, ?MODULE, {Pin, Direction}, []).
-
--spec(start(pin(), pin_direction()) -> {ok, pid()} | {error, reason}).
-start(Pin, Direction) ->
-  gen_server:start(?MODULE, {Pin, Direction}, []).
 
 -spec(start_link(pin(), pin_direction()) -> {ok, pid()} | {error, reason}).
 start_link(Pin, Direction) ->
@@ -154,6 +145,13 @@ init({Pin, Direction}) ->
     Port = ale_util:open_port(["gpio",
                                integer_to_list(Pin),
                                atom_to_list(Direction)]),
+	
+	%% If the gen_server is part of a supervision tree and is ordered by its 
+	%% supervisor to terminate, this function will be called with Reason=shutdown if the following conditions apply:
+	%% the gen_server has been set to trap exit signals, and the shutdown strategy as defined in the supervisor's 
+	%% child specification is an integer timeout value, not brutal_kill.
+	process_flag(trap_exit, true),
+	
     {ok, #state{pin=Pin, port=Port}}.
 
 handle_call({write, Value}, _From, #state{port=Port}=State) ->

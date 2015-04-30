@@ -21,7 +21,7 @@
 -define(DRV_I2C_MODULE, i2c).
 -define(DRV_SPI_MODULE, spi).
 
--define(START_FUNC_DRV_MODULE, start).
+-define(START_FUNC_DRV_MODULE, start_link).
 -define(STOP_FUNC_DRV_MODULE, stop).
 
 %% ====================================================================

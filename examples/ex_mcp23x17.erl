@@ -24,10 +24,8 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start_i2c_blinking_led/4, stop_i2c_blinking_led/0]).
--export([start_spi_blinking_led/4, stop_spi_blinking_led/0]).
-
-
+-export([start_i2c_blinking_led/4, stop_i2c_blinking_led/3]).
+-export([start_spi_blinking_led/4, stop_spi_blinking_led/3]).
 
 %% ====================================================================
 %% Behavioural functions 
@@ -52,8 +50,10 @@
 -spec start_i2c_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin(), timer_in_msec()) -> ok | {error, term()}.
 %% ====================================================================
 start_i2c_blinking_led(HwAddr, Port, Pin, Timer) ->
-	case gen_server:start({local, i2c_blinking_led}, ?MODULE, [{i2c_blinking_led, HwAddr, Port, Pin, Timer}], [{timeout, ?TIMEOUT_FOR_OPERATION}]) of
+	ProcessName = get_process_name(i2c, HwAddr, Port, Pin),
+	case gen_server:start({local, ProcessName}, ?MODULE, [{i2c_blinking_led, HwAddr, Port, Pin, Timer}], [{timeout, ?TIMEOUT_FOR_OPERATION}]) of
 		{ok, _Pid} ->
+			?DO_INFO("Process has been started.", [{processName, ProcessName}]),
 			ok;
 		{error,R} ->
 			{error,R}
@@ -63,12 +63,14 @@ start_i2c_blinking_led(HwAddr, Port, Pin, Timer) ->
 %% @doc
 %% Stop blinking Led on I2C device.
 %% @end
--spec stop_i2c_blinking_led() -> ok.
+-spec stop_i2c_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin()) -> ok.
 %% ====================================================================
-stop_i2c_blinking_led() ->
-	case whereis(i2c_blinking_led) of
+stop_i2c_blinking_led(HwAddr, Port, Pin) ->
+	ProcessName = get_process_name(i2c, HwAddr, Port, Pin),
+	case whereis(ProcessName) of
 		P when is_pid(P) ->
-			gen_server:call(i2c_blinking_led, {stop}, ?TIMEOUT_FOR_OPERATION);
+			?DO_INFO("Process is going to be stopped.", [{processName, ProcessName}]),
+			gen_server:call(ProcessName, {stop}, ?TIMEOUT_FOR_OPERATION);
 		_->	ok
 	end.
 
@@ -86,8 +88,10 @@ stop_i2c_blinking_led() ->
 -spec start_spi_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin(), timer_in_msec()) -> ok | {error, term()}.
 %% ====================================================================
 start_spi_blinking_led(HwAddr, Port, Pin, Timer) ->
-	case gen_server:start({local, spi_blinking_led}, ?MODULE, [{spi_blinking_led, HwAddr, Port, Pin, Timer}], [{timeout, ?TIMEOUT_FOR_OPERATION}]) of
+	ProcessName = get_process_name(spi, HwAddr, Port, Pin),
+	case gen_server:start({local, ProcessName}, ?MODULE, [{spi_blinking_led, HwAddr, Port, Pin, Timer}], [{timeout, ?TIMEOUT_FOR_OPERATION}]) of
 		{ok, _Pid} ->
+			?DO_INFO("Process has been started.", [{processName, ProcessName}]),
 			ok;
 		{error,R} ->
 			{error,R}
@@ -97,12 +101,14 @@ start_spi_blinking_led(HwAddr, Port, Pin, Timer) ->
 %% @doc
 %% Stop blinking Led on SPI device.
 %% @end
--spec stop_spi_blinking_led() -> ok.
+-spec stop_spi_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin()) -> ok.
 %% ====================================================================
-stop_spi_blinking_led() ->
-	case whereis(spi_blinking_led) of
+stop_spi_blinking_led(HwAddr, Port, Pin) ->
+	ProcessName = get_process_name(spi, HwAddr, Port, Pin),
+	case whereis(ProcessName) of
 		P when is_pid(P) ->
-			gen_server:call(spi_blinking_led, {stop}, ?TIMEOUT_FOR_OPERATION);
+			?DO_INFO("Processis going to be stopped.", [{processName, ProcessName}]),
+			gen_server:call(ProcessName, {stop}, ?TIMEOUT_FOR_OPERATION);
 		_->	ok
 	end.
 
@@ -300,4 +306,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ====================================================================
 
+get_process_name(i2c, HwAddr, Port, Pin) ->
+	erlang:list_to_atom(lists:concat([i2c, '_', HwAddr, '_', Port, '_', Pin]));
+get_process_name(spi, HwAddr, Port, Pin) ->
+	erlang:list_to_atom(lists:concat([spi, '_', HwAddr, '_', Port, '_', Pin])).
 

@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2, start/3, start_link/2, start_link/3, stop/1]).
+-export([start_link/2, start_link/3, stop/1]).
 -export([write/2, read/2, write_read/3]).
 
 %% gen_server callbacks
@@ -33,14 +33,6 @@
 %% Starts the process with the channel name and Initialize the devname device.
 %% You can identify the device by a channel name. Each channel drive a devname device.
 %% @end
--spec(start(tuple(), devname(), addr()) -> {ok, pid()} | {error, reason}).
-start(ServerName, Devname, Address) ->
-    gen_server:start(ServerName, ?MODULE, {Devname, Address}, []).
-
--spec(start(devname(), addr()) -> {ok, pid()} | {error, reason}).
-start(Devname, Address) ->
-    gen_server:start(?MODULE, {Devname, Address}, []).
-
 -spec(start_link(tuple(), devname(), addr()) -> {ok, pid()} | {error, reason}).
 start_link(ServerName, Devname, Address) ->
     gen_server:start_link(ServerName, ?MODULE, {Devname, Address}, []).
@@ -93,6 +85,14 @@ init({Devname, Address}) ->
     Port = ale_util:open_port(["i2c",
                                "/dev/" ++ Devname,
                                integer_to_list(Address)]),
+
+
+	%% If the gen_server is part of a supervision tree and is ordered by its 
+	%% supervisor to terminate, this function will be called with Reason=shutdown if the following conditions apply:
+	%% the gen_server has been set to trap exit signals, and the shutdown strategy as defined in the supervisor's 
+	%% child specification is an integer timeout value, not brutal_kill.
+	process_flag(trap_exit, true),
+	
     {ok, Port}.
 
 %%--------------------------------------------------------------------
@@ -145,6 +145,10 @@ handle_cast(stop, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(brutal_kill, State) ->
+	brutal_kill:i(),
+	{noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 

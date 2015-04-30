@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2, start/3, start_link/2, start_link/3, stop/1]).
+-export([start_link/2, start_link/3, stop/1]).
 -export([transfer/2]).
 
 %% gen_server callbacks
@@ -32,14 +32,6 @@
 %% @doc
 %% Starts the process and initialize the device.
 %% @end
--spec(start(term(), devname(), list()) -> {ok, pid()} | {error, reason}).
-start(ServerName, Devname, SpiOptions) ->
-    gen_server:start(ServerName, ?MODULE, {Devname, SpiOptions}, []).
-
--spec(start(devname(), list()) -> {ok, pid()} | {error, reason}).
-start(Devname, SpiOptions) ->
-    gen_server:start(?MODULE, {Devname, SpiOptions}, []).
-
 -spec(start_link(term(), devname(), list()) -> {ok, pid()} | {error, reason}).
 start_link(ServerName, Devname, SpiOptions) ->
     gen_server:start_link(ServerName, ?MODULE, {Devname, SpiOptions}, []).
@@ -89,6 +81,13 @@ init({Devname, SpiOptions}) ->
                                integer_to_list(BitsPerWord),
                                integer_to_list(SpeedHz),
                                integer_to_list(DelayUs)]),
+	
+	%% If the gen_server is part of a supervision tree and is ordered by its 
+	%% supervisor to terminate, this function will be called with Reason=shutdown if the following conditions apply:
+	%% the gen_server has been set to trap exit signals, and the shutdown strategy as defined in the supervisor's 
+	%% child specification is an integer timeout value, not brutal_kill.
+	process_flag(trap_exit, true),
+	
     {ok, Port}.
 
 %%--------------------------------------------------------------------

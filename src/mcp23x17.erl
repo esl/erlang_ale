@@ -562,7 +562,7 @@ i2c_driver_stop(CommType, HwAddr) ->
 -spec spi_driver_stop(mcp23x17_comm_type()) -> ok | {error, term()}.
 %% ====================================================================
 spi_driver_stop(CommType) ->
-	ale_handler:spi_stop(get_comm_devicename(CommType), ?SPI_DEVICE_DEFAULT_OPTIONS).
+	ale_handler:spi_stop(get_comm_devicename(CommType)).
 
 %% ====================================================================
 %% @doc <a href="http://www.erlang.org/doc/man/gen_server.html#Module:init-1">gen_server:init/1</a>
