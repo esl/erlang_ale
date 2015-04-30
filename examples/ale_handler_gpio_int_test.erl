@@ -35,7 +35,7 @@ start_link() ->
 -spec set_int_condition(interrupt_condition()) -> ok | {error, term()}.
 %% ====================================================================
 set_int_condition(IntCondition)->
-	case gen_server:call(?SERVER, {set_int_condition, IntCondition}, 1000) of
+	case gen_server:call(?SERVER, {set_int_condition, IntCondition}, 5000) of
 		ok ->
 			ok;
 		ER->{error, ER}
@@ -49,7 +49,7 @@ set_int_condition(IntCondition)->
 -spec press_btn() -> ok | {error, term()}.
 %% ====================================================================
 press_btn()->
-	case gen_server:call(?SERVER, {press_btn}, 1000) of
+	case gen_server:call(?SERVER, {press_btn}, 5000) of
 		ok ->
 			ok;
 		ER->{error, ER}
@@ -64,7 +64,7 @@ press_btn()->
 -spec release_btn() -> ok | {error, term()}.
 %% ====================================================================
 release_btn()->
-	case gen_server:call(?SERVER, {release_btn}, 1000) of
+	case gen_server:call(?SERVER, {release_btn}, 5000) of
 		ok ->
 			ok;
 		ER->{error, ER}
