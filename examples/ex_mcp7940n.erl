@@ -246,7 +246,7 @@ handle_cast(_Msg, State) ->
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
 handle_info({?NOTIFICATION_PWR_IS_BACK, PwrDownTS, PwrUpTS}, State) ->
-	error_logger:info_report("Main power of RTC is back", {powerDownTime, PwrDownTS}, {powerUpTime, PwrUpTS}),
+	error_logger:info_report(["Main power of RTC is back", {powerDownTime, PwrDownTS}, {powerUpTime, PwrUpTS}]),
 	{noreply, State};
 
 handle_info({?NOTIFICATION_PWR_IS_LOST}, State) ->

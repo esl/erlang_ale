@@ -568,9 +568,12 @@ init([TimeFormat, Vbaten]) ->
 			
 			do_init(),
 			
+			%% Start timer for  check Main Power of RTC device
+			{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+
 			?DO_INFO("RTC has been started", []),
 			
-			{ok, #state{}};
+			{ok, #state{pwrStatusCheckIntervalTref = TRef}};
 		
 		{ok, ?RTC_WKDAY_BIT_VBATEN_DIS} ->
 			%% Configure the current Date and Time anyway.
@@ -607,8 +610,12 @@ init([TimeFormat, Vbaten]) ->
 			
 			do_init(),
 			
+			%% Start timer for  check Main Power of RTC device
+			{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
+			
 			?DO_INFO("RTC has been started", []),
-			{ok, #state{}};
+			
+			{ok, #state{pwrStatusCheckIntervalTref = TRef}};
 		
 		ER ->
 			?DO_ERR("Faild to do_init RTC device.", [{reason, ER}]),
@@ -674,19 +681,7 @@ handle_call({pwr_status_change_subscribe, PidToSendNotification}, _From, State) 
 			?DO_INFO("Pid has been subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
 			
 			NewPwrStatusNotificationPidList = lists:append(State#state.pwrStatusNotificationPidList, [PidToSendNotification]),
-			
-			%% Start timer for periodic check, if not yet started.
-			case State#state.pwrStatusCheckIntervalTref of
-				undefined ->
-					%% Timer does not started. Do it.
-					{ok, TRef} = timer:send_interval(?PWR_STATUS_CHECK_INTERVAL, self(), {pwr_status_check}),
-					
-					{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList,
-											 pwrStatusCheckIntervalTref = TRef}};
-				_->
-					%% Timer already started.
-					{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList}}
-			end
+			{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList}}
 	end;
 
 handle_call({pwr_status_change_unsubscribe, PidToSendNotification}, _From, State) ->
@@ -695,16 +690,7 @@ handle_call({pwr_status_change_unsubscribe, PidToSendNotification}, _From, State
 			?DO_INFO("Pid has been unsubscribed to the PWR change notification", [{pid, PidToSendNotification}]),
 			
 			NewPwrStatusNotificationPidList = lists:delete(PidToSendNotification, State#state.pwrStatusNotificationPidList),
-			
-			%% Cancel timer if pidlist is empty.
-			case NewPwrStatusNotificationPidList of
-				[] ->
-					timer:cancel(State#state.pwrStatusCheckIntervalTref),
-					{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList,
-											 pwrStatusCheckIntervalTref = undefined}};
-				
-				_->	{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList}}
-			end;
+			{reply, ok, State#state {pwrStatusNotificationPidList = NewPwrStatusNotificationPidList}};
 		false ->
 			?DO_ERR("Pid does not subscribed to the PWR change notification", [{pid, PidToSendNotification}]),
 			{reply, {error, {pid_does_not_subscribed_to_pwr_change_notification, PidToSendNotification}}, State}
