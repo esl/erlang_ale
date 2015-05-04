@@ -44,7 +44,7 @@
 		]).
 
 -export([i2c_driver_stop/2, spi_driver_stop/1]).
-
+-export([set_hwaddr_for_write/1, set_hwaddr_for_read/1]).
 
 
 %% ====================================================================

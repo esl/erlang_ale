@@ -23,7 +23,7 @@ ex_gpio_int: compile
 	erl -pa ${ALE_EBIN_DIR} -pa . -run ex_gpio_int start_link
 
 ex_mcp23x17: compile
-	erl -pa ${ALE_EBIN_DIR} -pa . -run mcp23x17 start_link
+	erl -pa ${ALE_EBIN_DIR} -pa . -run ex_mcp23x17 start_link
 	
 ex_mcp7940n: compile
 	erl -pa ${ALE_EBIN_DIR} -pa . -run ex_mcp7940n start_link

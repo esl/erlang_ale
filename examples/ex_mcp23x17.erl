@@ -19,11 +19,13 @@
 %% ====================================================================
 %% Defines
 %% ====================================================================
+-define(SERVER, ?MODULE).
 -define(TIMEOUT_FOR_OPERATION, 10000).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
+-export([start_link/0, stop/0]).
 -export([start_i2c_blinking_led/4, stop_i2c_blinking_led/3]).
 -export([start_spi_blinking_led/4, stop_spi_blinking_led/3]).
 
@@ -42,10 +44,43 @@
 
 %% ====================================================================
 %% @doc
+%% Start test application for MCP23x17 devices. This will start the following
+%% functions automatically:
+%%		start_i2c_blinking_led/4, start_spi_blinking_led/4
+%% @end
+-type res_ok()	::	{ok, pid()}.
+-type res_err()	::	{error, term()}.
+-spec start_link() -> {res_ok() | res_err(), res_ok() | res_err()}.
+%% ====================================================================
+start_link() ->
+	Res1 = start_i2c_blinking_led(32, ?MCP23X17_PORT_A, ?MCP23X17_PIN0, 500),
+	
+	%% This timer is needed to avoid "destroy" I2C driver process
+	%% when start SPI blinking. This is just a quick workaround,
+	%% the real root cause is unknown, but Iám working on it.
+	timer:sleep(2000),
+	
+	Res2 = start_spi_blinking_led(32, ?MCP23X17_PORT_A, ?MCP23X17_PIN0, 200),
+	{Res1, Res2}.
+
+%% ====================================================================
+%% @doc
+%% Stop test application for MCP23x17 device. This will call the next functions:
+%%		stop_i2c_blinking_led/3, stop_spi_blinking_led/3
+%% @end
+-spec stop() -> {ok | {error,term()}, ok | {error,term()}}.
+%% ====================================================================
+stop() ->
+	Res1 = stop_i2c_blinking_led(32, ?MCP23X17_PORT_A, ?MCP23X17_PIN0),
+	Res2 = stop_spi_blinking_led(32, ?MCP23X17_PORT_A, ?MCP23X17_PIN0),
+	{Res1, Res2}.
+
+%% ====================================================================
+%% @doc
 %% Blinking a led connected to any Pin of MCP23017 (I2C) IO expander device.
 %% Notes:
 %%		In this example i2c-1 device on Raspberry Pi has been used.
-%% 
+%%
 %% @end
 -spec start_i2c_blinking_led(hw_addr(), mcp23x17_port(), mcp23x17_pin(), timer_in_msec()) -> ok | {error, term()}.
 %% ====================================================================

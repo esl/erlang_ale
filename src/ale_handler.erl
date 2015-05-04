@@ -321,7 +321,9 @@ i2c_stop(DeviceName, HWAddress) ->
 i2c_write({sup, DeviceName}, HWAddress, Data) ->
  	%% Start ALE handler if not started yet.
  	start_link({?MODULE, i2c_write,  [DeviceName, HWAddress, Data]}, {?DRV_I2C_MODULE, ?START_FUNC_DRV_MODULE, [DeviceName, HWAddress]});
-i2c_write(DeviceName, HWAddress, Data) ->
+i2c_write(DeviceName, HWAddress, Data) when is_integer(Data)->
+	i2c_write(DeviceName, HWAddress, erlang:integer_to_binary(Data));
+i2c_write(DeviceName, HWAddress, Data) when is_binary(Data)->
 	%% Start supervisor if not started yet.
 	Res = case erlang_ale_sup:start_link() of
 		{ok, _SupPid} ->
