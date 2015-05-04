@@ -57,7 +57,7 @@ start_link() ->
 	
 	%% This timer is needed to avoid "destroy" I2C driver process
 	%% when start SPI blinking. This is just a quick workaround,
-	%% the real root cause is unknown, but Iám working on it.
+	%% the real root cause is unknown, but I am working on it.
 	timer:sleep(2000),
 	
 	Res2 = start_spi_blinking_led(32, ?MCP23X17_PORT_A, ?MCP23X17_PIN0, 200),
