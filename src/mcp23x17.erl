@@ -96,7 +96,7 @@ stop() ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %%	 IPol		: input polarity register/bit
 %%				 	This register allows the user to configure the polarity on
 %%				 	the corresponding GPIO Port bits.
@@ -163,7 +163,7 @@ setup_interrupt(CommType, HwAddr, Port, Pin, IPol, PullUpRes, DefComp, IntCtrl) 
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %% Output:
 %%	 -
 %% @end
@@ -179,7 +179,7 @@ enable_interrupt(CommType, HwAddr, Port, Pin) ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %% Output:
 %%	 -
 %% @end
@@ -379,7 +379,7 @@ setup_io_direction(CommType, HwAddr, Port, Pin, IODir) ->
 %%	 CommType		: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr			: HW address of MCP chip
 %%	 Port			: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin			: the Pin id of Port, <0..7>
+%%	 Pin			: the Pin id of Port
 %%	 LogicalLevel	: mcp23x17_io_logical_level()
 %% Output:
 %%	 ok | {error, Reason}
@@ -420,7 +420,7 @@ setup_io_logical_level(CommType, HwAddr, Port, Pin, LogicalLevel) ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %% Output:
 %%	 {ok, mcp23x17_io_logical_level()} | {error, Reason}
 %% @end
@@ -448,7 +448,7 @@ get_io_logical_level(CommType, HwAddr, Port, Pin) ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %%	 PullUpRes	: mcp23x17_pull_up_res_en() | mcp23x17_pull_up_res_dis()
 %% Output:
 %%	 -
@@ -482,7 +482,7 @@ setup_pull_up_resistor(CommType, HwAddr, Port, Pin, PullUpRes) ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %%	 IPol		: mcp23x17_in_pol()
 %% Output:
 %%	 -
@@ -515,7 +515,7 @@ setup_input_polarity(CommType, HwAddr, Port, Pin, IPol) ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %% Output:
 %%	{ok, Rec} | {error, Reason}
 %% ====================================================================
@@ -798,7 +798,7 @@ get_comm_devicename(CommType) ->
 %%	 CommType	: type of serial communication. It can be MCP_COMM_TYPE_SPI | MCP_COMM_TYPE_I2C
 %%	 HwAddr		: HW address of MCP chip
 %%	 Port		: possible value can be MCP23X17_PORT_A | MCP23X17_PORT_B
-%%	 Pin		: the Pin id of Port, <0..7>
+%%	 Pin		: the Pin id of Port
 %%	 EnDis		: en | dis
 %% Output:
 %%	ok | {error, Reason}

@@ -28,12 +28,6 @@
 %% ====================================================================
 
 %% ====================================================================
-%% Test related functions
-%% ====================================================================
--export([
-		 test_alarm_interrupt/0]).
-
-%% ====================================================================
 %% Control register setting
 %% ====================================================================
 -export([ctrl_bit_out_set/1,
@@ -212,23 +206,6 @@ stop() ->
 		_->	%% Process is not running.
 			ok
 	end. 
-
-%% ====================================================================
-%% @doc
-%% This function will start server process if that is is not yet started,
-%% than it will configure RTC Date And Time to the locatime, and finally
-%% it will configure ALARM-0. The Date and Time of Alarm will be localtime+1min.
-%% @end
--spec test_alarm_interrupt() -> ok | {error, term()}.
-%% ====================================================================
-test_alarm_interrupt() ->
-	start(?RTC_HOUR_BIT_TIME_FORMAT_24H, ?RTC_WKDAY_BIT_VBATEN_EN),
-	date_and_time_set(?RTC_HOUR_BIT_TIME_FORMAT_24H),
-	
-	{ok, {{Y,M,D},{H,Min,S}}} = date_and_time_get(),
-	
-	alarm_configure(?RTC_ALARM_0_ID, {{Y,M,D},{H,Min+1,S}}, ?RTC_ALMxWKDAY_BIT_ALMxMASK_ALL_MATCH, ?RTC_CTRL_BIT_ALM_Ax_EN, ?RTC_ALMxWKDAY_BIT_ALMPOL_HIGH).
-
 
 %% ====================================================================
 %% @doc

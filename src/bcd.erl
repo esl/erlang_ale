@@ -18,7 +18,7 @@
 %% The pad with leading zeros.
 %% example:
 %% 		47> bcd:encode(19,1).
-%% 		<<25>>
+%% 		&lt;&lt;25&gt;&gt;
 %% 		48> 
 %% @end
 -spec encode(integer(), integer()) -> binary().
@@ -31,7 +31,7 @@ encode(IntToBcd, Size) ->
 %% Unpack the given size of BCD binary into an integer
 %% strip leading zeros.
 %% example:
-%% 		48> bcd:decode(<<25>>,1).
+%% 		48> bcd:decode(&lt;&lt;25&gt;&gt;,1).
 %% 		19
 %% 		49>
 %% @end
