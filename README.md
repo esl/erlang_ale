@@ -186,7 +186,7 @@ enabled and that the `i2c-dev` module has been inserted.
     8> i2c:write_read(IoExpander, <<9>>, 1).
     <<17>>
 
-# General supervision of started GPIO, I2C and SPI divers, processes
+# General supervision of started GPIO, I2C and SPI drivers
 
 With this feature applications running on top of Erlang/ALE, can be sure the started GPIO, I2C and SPI
 drivers will automatically restart when those are terminating for any reason, expect the controlled shutdown
