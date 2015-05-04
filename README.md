@@ -25,6 +25,15 @@ If you're cross-compiling, you'll need to setup your environment so that the
 right C compiler is called. See the `Makefile` for the variables that will need
 to be overridden.
 
+# Documentation
+
+It is possible generate HTML documentation from the self documented source.
+	
+	cd erlang_ale
+	make docs
+
+The HTML files can be seen in the erlang_ale/doc folder. Open the index.html file, and read.
+
 # Examples
 
 The following examples were tested on a
@@ -178,9 +187,10 @@ enabled and that the `i2c-dev` module has been inserted.
     <<17>>
 
 # General supervision of started GPIO, I2C and SPI divers, processes
-	With this feature applications running on top of Erlang/ALE, can be sure the started GPIO, I2C and SPI
-	drivers will automatically restart when those are terminating for any reason, expect the controlled shutdown
-	initiated by the application on top of Erlang/ALE.
+
+With this feature applications running on top of Erlang/ALE, can be sure the started GPIO, I2C and SPI
+drivers will automatically restart when those are terminating for any reason, expect the controlled shutdown
+initiated by the application on top of Erlang/ALE.
 	
 	Below the possible features are described:
 		- Read GPIO logical value. 
@@ -426,6 +436,185 @@ The next features of MCP23x17 devices are implemented:
 More can be seen in the example/ex_mcp23x17.erl module.
 
 # Support for MCP7940n RTC device
+
+The following features are implemented:
+	
+	- Start general gen_server for MCP794n RTC and do the basic setup:
+		Start the server 24H mode and enable VBat function. These are necessary for future configuration, mainly when configure Date and Time and alarms. The current local Date and Time will be configured automatically if the next conditions are met, otherwise Date and Time will not set automatically, but it is always possible to do by calling the function mcp7940n:date_and_time_set/1.
+		
+		- VBat disabled or
+		- VBat enabled but main power of RTC device was lost for same reason. The PWRFAIL bit equals with 1.
+		
+		1> mcp7940n:start(0,1).
+		
+		=INFO REPORT==== 4-May-2015::12:28:53 ===
+		    "ALE driver process has been started and registered successfully."
+		    initialMFA: {ale_handler,i2c_write,["i2c-1",111,<<3>>]}
+		    drvModule: i2c
+		    drvStartFunction: start_link
+		    drvStartArgs: ["i2c-1",111]
+		    drvPid: <0.38.0>
+		    module: ale_handler
+		    line: 732
+		
+		=INFO REPORT==== 4-May-2015::12:28:53 ===
+		    "Alarm interrupt has been disabled"
+		    alarmId: 0
+		    module: mcp7940n
+		    line: 1307
+		
+		=INFO REPORT==== 4-May-2015::12:28:53 ===
+		    "Alarm interrupt has been disabled"
+		    alarmId: 1
+		    module: mcp7940n
+		    line: 1307
+		
+		=INFO REPORT==== 4-May-2015::12:28:53 ===
+		    "RTC oscillator has been started"
+		    module: mcp7940n
+		    line: 1627
+		
+		=INFO REPORT==== 4-May-2015::12:28:54 ===
+		    "RTC has been started"
+		    module: mcp7940n
+		    line: 551
+		{ok,<0.35.0>}
+
+	- Configure CONTROL register bits
+		OUT, SQWEN, ALM1EN, ALM0EN, EXTOSC, CRSTRIM, SQWFS1, SQWFS0
+		
+	- Configure Date&Time. Both 12H and 24H modes are supported.
+		
+		2> LocalTime=calendar:local_time().
+		{{2015,5,4},{12,29,25}}
+		3> mcp7940n:date_and_time_set(LocalTime).
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "RTC oscillator has been stopped"
+		    module: mcp7940n
+		    line: 1650
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "Alarm interrupt has been disabled"
+		    alarmId: 0
+		    module: mcp7940n
+		    line: 1307
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "Alarm interrupt has been disabled"
+		    alarmId: 1
+		    module: mcp7940n
+		    line: 1307
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "Alarm interrupt has been disabled"
+		    alarmId: 0
+		    module: mcp7940n
+		    line: 1307
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "Alarm interrupt has been disabled"
+		    alarmId: 1
+		    module: mcp7940n
+		    line: 1307
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "RTC oscillator has been started"
+		    module: mcp7940n
+		    line: 1627
+		
+		=INFO REPORT==== 4-May-2015::12:29:40 ===
+		    "Date and Time has been configured in RTC"
+		    dateAndTime: {{2015,5,4},{12,29,25}}
+		    module: mcp7940n
+		    line: 1720
+		ok
+		
+	- Read current Date and Time in RTC device
+	
+		16> mcp7940n:date_and_time_get().
+		{ok,{{2015,5,4},{12,53,31}}}
+		17>
+	
+	- Configure Alarm modules
+		Alarm-0, Alarm-1
+		
+		Below example shows how to configure Alarm-0 module. The Alarm time will be local data and time + 1 minute. Alarm will be generated when sec, min, hour, wday attributes are matches. The alarm logical polarity will be HIGH (=1).
+		
+		7> LocalDateTime=calendar:local_time().
+		{{2015,5,4},{12,31,11}}
+		8> {Date,{H,M,S}} = LocalDateTime.
+		{{2015,5,4},{12,31,11}}
+		9> Alarm0DateTime={Date,{H,M+1,S}}.
+		{{2015,5,4},{12,32,11}}
+		10> mcp7940n:alarm_configure(0, Alarm0DateTime, 2#111, 1, 1).
+		
+		=INFO REPORT==== 4-May-2015::12:31:19 ===
+		    "Alarm interrupt has been enabled"
+		    alarmId: 0
+		    module: mcp7940n
+		    line: 1275
+		
+		=INFO REPORT==== 4-May-2015::12:31:19 ===
+		    "Alarm interrupt has been configured"
+		    alarmId: 0
+		    module: mcp7940n
+		    line: 1444
+		ok
+		
+	- Check alarm status by command if MFP PIN of RTC device does not wired to anywhere
+	
+		13> mcp7940n:alarm_interrupt_flag_check(0).
+		{ok,0} -----> There is no Alarm on Alarm-0 module.
+		
+		14> mcp7940n:alarm_interrupt_flag_check(0).
+		{ok,1} -----> Alarm has been triggered on Alarm-0 module.
+	
+	- Supervise main power of RTC device
+		It is possible subscribe/unsubscribe for "Main Power change notification". The following notifications may received in the application who has subscribed on this event:
+		
+		{main_power_is_lost} - when Main power of RTC device is lost.
+		{main_power_is_back, DateTimeWhenPowerLost, DateTimeWhenPowerBack} - when Main power of RTC device is back.
+		
+		17> mcp7940n:pwr_status_change_subscribe().
+		
+		=INFO REPORT==== 4-May-2015::13:00:23 ===
+		    "Pid has been subscribed to the PWR change notification"
+		    pid: <0.33.0>
+		    module: mcp7940n
+		    line: 658
+		ok
+		18>
+
+	- Supervise oscillator module of RTC device
+		It is possible subscribe/unsubscribe for "Change status of oscillator notification". The following notifications may received in the application who has subscribed on this event:
+		
+		{oscillator_is_running} - when RTC's oscillator is running properly.
+		{oscillator_is_not_running, AnyReason} - when RTC's oscillator has some failure.
+		
+		18> mcp7940n:oscillator_status_change_subscribe().
+		
+		=INFO REPORT==== 4-May-2015::13:01:00 ===
+		    "Pid has been subscribed to the OSCILLATOR change notification"
+		    pid: <0.33.0>
+		    module: mcp7940n
+		    line: 685
+		ok
+		19>
+		=INFO REPORT==== 4-May-2015::13:01:01 ===
+		    "RTC oscillator is running"
+		    module: mcp7940n
+		    line: 862
+
+	- Read/Write User Memory area
+		
+		19> mcp7940n:write_sram(32, 2).
+		ok
+		20> mcp7940n:read_sram(32).
+		{ok,2}
+		21>
+
+More example can be seen in example/ex_mcp7940n.erl module. This documented in examples/README.md.
 
 # FAQ
 

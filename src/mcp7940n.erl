@@ -986,7 +986,7 @@ do_ctrl_bit_out_set(CtrlBitOut) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_out, CtrlBitOut) of
 				{ok,_} ->
-					?DO_INFO("CONTROL REG OUT bit has been set", []),
+					%%?DO_INFO("CONTROL REG OUT bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG OUT bit.", [{reason, ER}]),
@@ -1008,7 +1008,7 @@ do_ctrl_bit_sqwen_set(Sqwen) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwEn, Sqwen) of
 				{ok,_} ->
-					?DO_INFO("CONTROL REG SQWEN bit has been set", []),
+					%%?DO_INFO("CONTROL REG SQWEN bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG SQWEN bit", [{reason, ER}]),
@@ -1030,7 +1030,7 @@ do_ctrl_bit_extosc_set(Extosc) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_extOsc, Extosc) of
 				{ok,_} ->
-					?DO_INFO("CONTROL REG EXTOSC bit has been set", []),
+					%%?DO_INFO("CONTROL REG EXTOSC bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG EXTOSC bit.", [{reason, ER}]),
@@ -1052,7 +1052,7 @@ do_ctrl_bit_crstrim_set(Crstrim) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_crsTrim, Crstrim) of
 				{ok,_} ->
-					?DO_INFO("CONTROL REG CRSTRIM bit has been set", []),
+					%%?DO_INFO("CONTROL REG CRSTRIM bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG CRSTRIM bit.", [{reason, ER}]),
@@ -1074,7 +1074,7 @@ do_ctrl_bit_sqwfs_set(Sqwfs) ->
 		{ok, RegisterValue} ->
 			case bitfield_set(RegisterValue, #rtcControlReg{}, #rtcControlReg.address, #rtcControlReg.bit_sqwfs, Sqwfs) of
 				{ok,_} ->
-					?DO_INFO("CONTROL REG SQWFS bit has been set", []),
+					%%?DO_INFO("CONTROL REG SQWFS bit has been set", []),
 					ok;
 				ER->
 					?DO_ERR("Failed to set CONTROL REG SQWFS bit.", [{reason, ER}]),
@@ -1762,7 +1762,7 @@ do_year_set(RegType, Year) ->
 														   {BitYearOneIdx, B0}
 														  ]) of
 		{ok,_} ->
-			?DO_INFO("Year has been set in RTC", [{regType, RegType}]),
+			%%?DO_INFO("Year has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Year in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1805,7 +1805,7 @@ do_year_set(RegType, Year) ->
 														   {BitMonthOneIdx, B0}
 														  ]) of
 		{ok,_}  ->
-			?DO_INFO("Month has been set in RTC", [{regType, RegType}]),
+			%%?DO_INFO("Month has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Month in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1848,7 +1848,7 @@ do_year_set(RegType, Year) ->
 														   {BitDateOneIdx, B0}
 														  ]) of
 		{ok,_}  ->
-			?DO_INFO("Date has been set in RTC", [{regType, RegType}]),
+			%%?DO_INFO("Date has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Date in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1900,7 +1900,7 @@ do_hour_set(RegType, {AMPM, Hour}) ->
 														   {Bit12HHrOneIdx, B0}
 														  ]) of
 		{ok,_}  ->
-			?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
+			%%?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Hour in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1939,7 +1939,7 @@ do_hour_set(RegType, {AMPM, Hour}) ->
 														   {Bit24HHrOneIdx, B0}
 														  ]) of
 		{ok,_} ->
-			?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
+			%%?DO_INFO("Hour has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Hour in RTC", [{regType, RegType}, {reason, ER}]),
@@ -1981,7 +1981,7 @@ do_minute_set(RegType, Minute) ->
 	case bitfield_set(0, RegisterRec, RegisterAddressIdx, [{BitMinuteTenIdx, B1},
 														   {BitMinuteOneIdx, B0}]) of
 		{ok,_} ->
-			?DO_INFO("Minute has been set in RTC", [{regType, RegType}]),
+			%%?DO_INFO("Minute has been set in RTC", [{regType, RegType}]),
 			ok;
 		ER->
 			?DO_ERR("Faild to set Minute in RTC", [{regType, RegType}, {reason, ER}]),
@@ -2026,7 +2026,7 @@ do_second_set(RegType, Second) ->
 			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitSecTenIdx, B1},
 																			   {BitSecOneIdx, B0}]) of
 				{ok,_} ->
-					?DO_INFO("Second has been set in RTC", [{regType, RegType}]),
+					%%?DO_INFO("Second has been set in RTC", [{regType, RegType}]),
 					ok;
 				ER->
 					?DO_ERR("Faild to set Second in RTC", [{regType, RegType}, {reason, ER}]),
@@ -2068,7 +2068,7 @@ do_wday_set(RegType, WDay) ->
 			%% Prepare register that write into the RTC device.
 			case bitfield_set(RegisterValue, RegisterRec, RegisterAddressIdx, [{BitWDayIdx, WDay}]) of
 				{ok,_} ->
-					?DO_INFO("WDay has been set in RTC", [{regType, RegType}]),
+					%%?DO_INFO("WDay has been set in RTC", [{regType, RegType}]),
 					ok;
 				ER->
 					?DO_ERR("Faild to set WDay in RTC", [{regType, RegType}, {reason, ER}]),
