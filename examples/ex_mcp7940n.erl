@@ -11,7 +11,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([start/0,
+-export([start_link/0,
 		 stop/0, 
 		 pwr_status_change_subscribe/0, 
 		 pwr_status_change_unsubscribe/0,
@@ -43,14 +43,14 @@
 %% Start test application. This will start RTC driver and will configure
 %% Date and Time to the localtime in 24H time format.
 %% @end
--spec start() -> {ok, pid()} | {error, term()}.
+-spec start_link() ->  {ok, pid()}  | {error, term()}.
 %% ====================================================================
-start() ->
+start_link() ->
 	case whereis(?SERVER) of
 		P when is_pid(P) ->
 			{ok, P};
 		_->
-			gen_server:start({local, ?SERVER}, ?MODULE, [], [{timeout, ?GENERAL_GENSERVER_TIMEOUT}])
+			gen_server:start_link({local, ?SERVER}, ?MODULE, [], [{timeout, ?GENERAL_GENSERVER_TIMEOUT}])
 	end.
 
 %% ====================================================================

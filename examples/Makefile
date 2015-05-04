@@ -13,13 +13,19 @@ compile:
 clean:
 	rm -rf *.beam
 
-gpio_counter: compile
-	erl -pa ${ALE_EBIN_DIR} -pa . -run gpio_counter start_link
-
-ale_handler_gpio_int_test: compile
-	erl -pa ${ALE_EBIN_DIR} -pa . -run ale_handler_gpio_int_test start_link
-
 shell:
 	erl -pa ${ALE_EBIN_DIR} -pa .
 	
-.PHONY: all compile clean shell gpio_counter
+gpio_counter: compile
+	erl -pa ${ALE_EBIN_DIR} -pa . -run gpio_counter start_link
+
+ex_gpio_int: compile
+	erl -pa ${ALE_EBIN_DIR} -pa . -run ex_gpio_int start_link
+
+ex_mcp23x17: compile
+	erl -pa ${ALE_EBIN_DIR} -pa . -run mcp23x17 start_link
+	
+ex_mcp7940n: compile
+	erl -pa ${ALE_EBIN_DIR} -pa . -run ex_mcp7940n start_link
+	
+.PHONY: all compile clean shell gpio_counter ex_gpio_int ex_mcp23x17 ex_mcp7940n
