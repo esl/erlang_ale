@@ -1,7 +1,6 @@
 %%% @author Ivan Iacono <ivan.iacono@erlang-solutions.com> - Erlang Solutions Ltd
 %%% @author Frank Hunleth <fhunleth@troodon-software.com>
-%%% @copyright (C) 2013, Erlang Solutions Ltd
-%%% @copyright (C) 2015, Frank Hunleth
+%%% @copyright (C) 2013, Erlang Solutions Ltd | 2015, Frank Hunleth
 %%% @doc
 %%% This is the implementation of the GPIO interface module.
 %%% @end

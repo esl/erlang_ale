@@ -25,6 +25,15 @@ If you're cross-compiling, you'll need to setup your environment so that the
 right C compiler is called. See the `Makefile` for the variables that will need
 to be overridden.
 
+# Documentation
+
+It is possible generate HTML documentation from the self documented source.
+	
+	cd erlang_ale
+	make docs
+
+The HTML files can be seen in the erlang_ale/doc folder. Open the index.html file, and read.
+
 # Examples
 
 The following examples were tested on a
