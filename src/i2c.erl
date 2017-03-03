@@ -58,11 +58,11 @@ write(ServerRef, Data) ->
 %% @doc
 %% Read data from an i2c slave device.
 %% @end
--spec(read(server_ref(), len()) -> {data()} | {error, reason}).
+-spec(read(server_ref(), len()) -> data() | {error, reason}).
 read(ServerRef, Len) ->
     gen_server:call(ServerRef, {read, Len}).
 
--spec(write_read(server_ref(), data(), len()) -> {data()} | {error, reason}).
+-spec(write_read(server_ref(), data(), len()) -> data() | {error, reason}).
 write_read(ServerRef, Data, Len) ->
     gen_server:call(ServerRef, {wrrd, Data, Len}).
 
