@@ -91,7 +91,7 @@ read(ServerRef) ->
 %% @end
 -spec set_int(server_ref(), interrupt_condition()) -> 'ok' | {'error', term()}.
 set_int(ServerRef, Condition) when Condition == enabled;
-                             Condition == summerize;
+                             Condition == summarize;
                              Condition == both;
                              Condition == rising;
                              Condition == falling;
