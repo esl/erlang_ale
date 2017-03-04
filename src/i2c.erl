@@ -19,11 +19,10 @@
 
 -define(SERVER, ?MODULE).
 
--type addr() :: integer(). %% fix to be 2-127
--type data() :: binary().
--type len() :: integer().
--type devname() :: string().
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 %%%===================================================================
 %%% API
@@ -85,6 +84,14 @@ init({Devname, Address}) ->
     Port = ale_util:open_port(["i2c",
                                "/dev/" ++ Devname,
                                integer_to_list(Address)]),
+
+
+	%% If the gen_server is part of a supervision tree and is ordered by its 
+	%% supervisor to terminate, this function will be called with Reason=shutdown if the following conditions apply:
+	%% the gen_server has been set to trap exit signals, and the shutdown strategy as defined in the supervisor's 
+	%% child specification is an integer timeout value, not brutal_kill.
+	process_flag(trap_exit, true),
+	
     {ok, Port}.
 
 %%--------------------------------------------------------------------
@@ -137,6 +144,10 @@ handle_cast(stop, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(brutal_kill, State) ->
+	brutal_kill:i(),
+	{noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 

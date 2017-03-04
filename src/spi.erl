@@ -19,9 +19,10 @@
 
 -define(SERVER, ?MODULE).
 
--type data() :: binary().
--type devname() :: string().
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 %%%===================================================================
 %%% API
@@ -79,6 +80,13 @@ init({Devname, SpiOptions}) ->
                                integer_to_list(BitsPerWord),
                                integer_to_list(SpeedHz),
                                integer_to_list(DelayUs)]),
+	
+	%% If the gen_server is part of a supervision tree and is ordered by its 
+	%% supervisor to terminate, this function will be called with Reason=shutdown if the following conditions apply:
+	%% the gen_server has been set to trap exit signals, and the shutdown strategy as defined in the supervisor's 
+	%% child specification is an integer timeout value, not brutal_kill.
+	process_flag(trap_exit, true),
+	
     {ok, Port}.
 
 %%--------------------------------------------------------------------

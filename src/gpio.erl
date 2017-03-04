@@ -29,11 +29,10 @@
 -define(REPLY, 0).
 -define(NOTIFICATION, 1).
 
--type pin() :: non_neg_integer().
--type pin_direction() :: 'input' | 'output'.
--type pin_state() :: 0 | 1.
--type interrupt_condition() :: 'enabled' | 'summarize' | 'none' | 'rising' | 'falling' | 'both'.
--type server_ref() :: atom() | {atom(), atom()} | pid().
+%%===================================================================
+%% Include ALE type definitions
+%%===================================================================
+-include("ale_type_def.hrl").
 
 -export_type([interrupt_condition/0]).
 
@@ -145,6 +144,13 @@ init({Pin, Direction}) ->
     Port = ale_util:open_port(["gpio",
                                integer_to_list(Pin),
                                atom_to_list(Direction)]),
+	
+	%% If the gen_server is part of a supervision tree and is ordered by its 
+	%% supervisor to terminate, this function will be called with Reason=shutdown if the following conditions apply:
+	%% the gen_server has been set to trap exit signals, and the shutdown strategy as defined in the supervisor's 
+	%% child specification is an integer timeout value, not brutal_kill.
+	process_flag(trap_exit, true),
+	
     {ok, #state{pin=Pin, port=Port}}.
 
 handle_call({write, Value}, _From, #state{port=Port}=State) ->
@@ -163,6 +169,7 @@ handle_call({register_int, Pid}, _From,
     {reply, ok, State#state{pids=NewPids}};
 handle_call({unregister_int, Pid}, _From,
             #state{pids=Pids}=State) ->
+	unlink(Pid),
     NewPids = lists:delete(Pid, Pids),
     {reply, ok, State#state{pids=NewPids}}.
 
@@ -183,6 +190,11 @@ handle_cast(stop, State) ->
 handle_info({Port, {data, <<?NOTIFICATION, Msg/binary>>}},
             #state{port=Port, pids=Pids}=State) ->
     Notif = binary_to_term(Msg),
+%% 	error_logger:info_report(["@@@ Notification has been received from C driver.",
+%% 							  {port, Port},
+%% 							  {msg, {data, <<?NOTIFICATION, Msg/binary>>}},
+%% 							  {notification, Notif},
+%% 							  {pidList, Pids}]),
     [ Pid ! Notif || Pid <- Pids ],
     {noreply, State};
 handle_info({'EXIT', DeadPid, _Reason},     % a listener died
