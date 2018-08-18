@@ -1,38 +1,20 @@
 # Erlang/ALE -- Erlang Actor Library for Embedded
 
-[![Build Status](https://travis-ci.org/esl/erlang_ale.svg)](https://travis-ci.org/esl/erlang_ale)
-
 Erlang/ALE provides high level abstractions for interfacing to hardware
 peripherals through I2C, SPI, and GPIOs on embedded platforms.
 
 # Getting started
 
-Erlang/ALE supports both rebar3 and erlang.mk build tools. If you're natively compiling Erlang/ALE, everything should work like any other
-Erlang library. Normally, you would include `erlang_ale` as a dependency in your
-`rebar.config` or Makefile file. If you just want to try it out, do the following:
+Erlang/ALE supports rebar3. If you're natively compiling Erlang/ALE, everything should work like any other
+Erlang library. Normally, you would include `erlang_ale` as a dependency in your `rebar.config`. If you just want to try it out, do the following:
 
-    git clone https://github.com/esl/erlang_ale.git
+    git clone https://github.com/helium/erlang_ale.git
     
     Steps for rebar3 build tool:
     	rebar3 compile
     	rebar3 shell
-    
-    Steps for erlang.mk build tool:
-    	make
-    	make shell
 
-If you're cross-compiling, you'll need to setup your environment so that the
-right C compiler is called. See the `Makefile` for the variables that will need
-to be overridden.
-
-# Documentation
-
-It is possible generate HTML documentation from the self documented source.
-	
-	cd erlang_ale
-	make docs
-
-The HTML files can be seen in the erlang_ale/doc folder. Open the index.html file, and read.
+If you're cross-compiling, you'll need to setup your environment so that the right C compiler is called.
 
 # Examples
 
