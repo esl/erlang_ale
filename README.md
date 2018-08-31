@@ -1,5 +1,7 @@
 # Erlang/ALE -- Erlang Actor Library for Embedded
 
+[![Build Status](https://travis-ci.org/esl/erlang_ale.svg)](https://travis-ci.org/esl/erlang_ale)
+
 Erlang/ALE provides high level abstractions for interfacing to hardware
 peripherals through I2C, SPI, and GPIOs on embedded platforms.
 
@@ -8,7 +10,7 @@ peripherals through I2C, SPI, and GPIOs on embedded platforms.
 Erlang/ALE supports rebar3. If you're natively compiling Erlang/ALE, everything should work like any other
 Erlang library. Normally, you would include `erlang_ale` as a dependency in your `rebar.config`. If you just want to try it out, do the following:
 
-    git clone https://github.com/helium/erlang_ale.git
+    git clone https://github.com/esl/erlang_ale.git
     
     Steps for rebar3 build tool:
     	rebar3 compile
