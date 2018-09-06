@@ -14,15 +14,15 @@ Erlang library. Normally, you would include `erlang_ale` as a dependency in your
     git clone https://github.com/esl/erlang_ale.git
     
     Steps for rebar3 build tool:
-    	rebar3 compile
-    	rebar3 shell
+       make compile
+       ./rebar3 shell
     
     Steps for erlang.mk build tool:
-    	make
-    	make shell
+       make -f erlang.mk app
+       make -f erlang.mk shell
 
 If you're cross-compiling, you'll need to setup your environment so that the
-right C compiler is called. See the `Makefile` for the variables that will need
+right C compiler is called. See the `erlang.mk` for the variables that will need
 to be overridden.
 
 # Documentation
@@ -30,7 +30,7 @@ to be overridden.
 It is possible generate HTML documentation from the self documented source.
 	
 	cd erlang_ale
-	make docs
+	make -f erlang.mk docs
 
 The HTML files can be seen in the erlang_ale/doc folder. Open the index.html file, and read.
 
