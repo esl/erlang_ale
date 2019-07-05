@@ -41,9 +41,13 @@ struct i2c_info
 {
     int fd;
     unsigned int addr;
+    unsigned int max_block_size;
 };
 
-static void i2c_init(struct i2c_info *i2c, const char *devpath, unsigned int addr)
+static void i2c_init(struct i2c_info *i2c,
+                     const char *devpath,
+                     unsigned int addr,
+                     unsigned int max_block_size)
 {
     memset(i2c, 0, sizeof(*i2c));
 
@@ -57,6 +61,7 @@ static void i2c_init(struct i2c_info *i2c, const char *devpath, unsigned int add
         err(EXIT_FAILURE, "ioctl(I2C_SLAVE %d)", addr);
 
     i2c->addr = addr;
+    i2c->max_block_size = max_block_size;
 }
 
 /**
@@ -133,10 +138,10 @@ static void i2c_handle_request(const char *req, void *cookie)
         long int len;
         if (ei_decode_long(req, &req_index, &len) < 0 ||
                 len < 1 ||
-                len > I2C_SMBUS_BLOCK_MAX)
-            errx(EXIT_FAILURE, "read amount: min=1, max=%d", I2C_SMBUS_BLOCK_MAX);
+                len > i2c->max_block_size)
+            errx(EXIT_FAILURE, "read amount: min=1, max=%d", i2c->max_block_size);
 
-        char data[I2C_SMBUS_BLOCK_MAX];
+        char data[i2c->max_block_size];
 
         if (i2c_transfer(i2c, 0, 0, data, len))
             ei_encode_binary(resp, &resp_index, data,len);
@@ -146,16 +151,16 @@ static void i2c_handle_request(const char *req, void *cookie)
             ei_encode_atom(resp, &resp_index, "i2c_read_failed");
         }
     } else if (strcmp(cmd, "write") == 0) {
-        char data[I2C_SMBUS_BLOCK_MAX];
+        char data[i2c->max_block_size];
         int len;
         int type;
         long llen;
         if (ei_get_type(req, &req_index, &type, &len) < 0 ||
                 type != ERL_BINARY_EXT ||
                 len < 1 ||
-                len > I2C_SMBUS_BLOCK_MAX ||
+                abs(len) > i2c->max_block_size ||
                 ei_decode_binary(req, &req_index, &data, &llen) < 0)
-            errx(EXIT_FAILURE, "write: need a binary between 1 and %d bytes", I2C_SMBUS_BLOCK_MAX);
+            errx(EXIT_FAILURE, "write: need a binary between 1 and %d bytes", i2c->max_block_size);
 
         if (i2c_transfer(i2c, data, len, 0, 0))
             ei_encode_atom(resp, &resp_index, "ok");
@@ -165,8 +170,8 @@ static void i2c_handle_request(const char *req, void *cookie)
             ei_encode_atom(resp, &resp_index, "i2c_write_failed");
         }
     } else if (strcmp(cmd, "wrrd") == 0) {
-        char write_data[I2C_SMBUS_BLOCK_MAX];
-        char read_data[I2C_SMBUS_BLOCK_MAX];
+        char write_data[i2c->max_block_size];
+        char read_data[i2c->max_block_size];
         int write_len;
         long int read_len;
         int type;
@@ -179,13 +184,13 @@ static void i2c_handle_request(const char *req, void *cookie)
         if (ei_get_type(req, &req_index, &type, &write_len) < 0 ||
                 type != ERL_BINARY_EXT ||
                 write_len < 1 ||
-                write_len > I2C_SMBUS_BLOCK_MAX ||
+                abs(write_len) > i2c->max_block_size ||
                 ei_decode_binary(req, &req_index, &write_data, &llen) < 0)
-            errx(EXIT_FAILURE, "wrrd: need a binary between 1 and %d bytes", I2C_SMBUS_BLOCK_MAX);
+            errx(EXIT_FAILURE, "wrrd: need a binary between 1 and %d bytes", i2c->max_block_size);
         if (ei_decode_long(req, &req_index, &read_len) < 0 ||
                 read_len < 1 ||
-                read_len > I2C_SMBUS_BLOCK_MAX)
-            errx(EXIT_FAILURE, "wrrd: read amount: min=1, max=%d", I2C_SMBUS_BLOCK_MAX);
+                read_len > i2c->max_block_size)
+            errx(EXIT_FAILURE, "wrrd: read amount: min=1, max=%d", i2c->max_block_size);
 
         if (i2c_transfer(i2c, write_data, write_len, read_data, read_len))
             ei_encode_binary(resp, &resp_index, read_data, read_len);
@@ -207,11 +212,21 @@ static void i2c_handle_request(const char *req, void *cookie)
  */
 int i2c_main(int argc, char *argv[])
 {
-    if (argc != 4)
+    if (argc < 4)
         errx(EXIT_FAILURE, "Must pass device path and device address as arguments");
 
     struct i2c_info i2c;
-    i2c_init(&i2c, argv[2], strtoul(argv[3], 0, 0));
+
+    // Parse optional max cmd_size, default to linux SMBUS maximum for
+    // backwards compatibility. If the caller passes 0 or the argument
+    // doens't parse as a number we assume the default value for now
+    unsigned int max_cmd_size = I2C_SMBUS_BLOCK_MAX;
+    if (argc > 4) {
+        max_cmd_size = strtoul(argv[4], 0, 0);
+        if (max_cmd_size == 0)
+            max_cmd_size = I2C_SMBUS_BLOCK_MAX;
+    }
+    i2c_init(&i2c, argv[2], strtoul(argv[3], 0, 0), max_cmd_size);
 
     struct erlcmd handler;
     erlcmd_init(&handler, i2c_handle_request, &i2c);

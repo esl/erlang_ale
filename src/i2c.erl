@@ -10,7 +10,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, start_link/3, stop/1]).
+-export([start_link/2, start_link/3, start_link/4, stop/1]).
 -export([write/2, read/2, write_read/3]).
 
 %% gen_server callbacks
@@ -33,13 +33,20 @@
 %% Starts the process with the channel name and Initialize the devname device.
 %% You can identify the device by a channel name. Each channel drive a devname device.
 %% @end
--spec(start_link(tuple(), devname(), addr()) -> {ok, pid()} | {error, reason}).
-start_link(ServerName, Devname, Address) ->
-    gen_server:start_link(ServerName, ?MODULE, {Devname, Address}, []).
+-spec(start_link(devname(), addr()) -> {ok, pid()} | {error, term()}).
+start_link(DevName, Address) ->
+    start_link(DevName, Address, 0).
 
--spec(start_link(devname(), addr()) -> {ok, pid()} | {error, reason}).
-start_link(Devname, Address) ->
-    gen_server:start_link(?MODULE, {Devname, Address}, []).
+-spec start_link(devname() | tuple(), addr() | devname(), non_neg_integer())
+                -> {ok, pid()} | {error, term()}.
+start_link(DevName, Address, MaxBlockSize) when is_list(DevName) ->
+    gen_server:start_link(?MODULE, {DevName, Address, MaxBlockSize}, []);
+start_link(ServerName, DevName, Address) when is_tuple(ServerName), is_list(DevName) ->
+    start_link(ServerName, DevName, Address, 0).
+
+start_link(ServerName, DevName, Address, MaxBlockSize) ->
+    gen_server:start_link(ServerName, ?MODULE, {DevName, Address, MaxBlockSize}, []).
+
 
 %% @doc
 %% Stop the process channel and release it.
@@ -51,18 +58,18 @@ stop(ServerRef) ->
 %% @doc
 %% Write data into an i2c slave device.
 %% @end
--spec(write(server_ref(), data()) -> ok | {error, reason}).
+-spec(write(server_ref(), data()) -> ok | {error, term()}).
 write(ServerRef, Data) ->
     gen_server:call(ServerRef, {write, Data}).
 
 %% @doc
 %% Read data from an i2c slave device.
 %% @end
--spec(read(server_ref(), len()) -> data() | {error, reason}).
+-spec(read(server_ref(), len()) -> data() | {error, term()}).
 read(ServerRef, Len) ->
     gen_server:call(ServerRef, {read, Len}).
 
--spec(write_read(server_ref(), data(), len()) -> data() | {error, reason}).
+-spec(write_read(server_ref(), data(), len()) -> data() | {error, term()}).
 write_read(ServerRef, Data, Len) ->
     gen_server:call(ServerRef, {wrrd, Data, Len}).
 
@@ -78,13 +85,14 @@ write_read(ServerRef, Data, Len) ->
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
 %%                     ignore |
-%%                     {stop, Reason}
+%%                     {stop, term()}
 %% @end
 %%--------------------------------------------------------------------
-init({Devname, Address}) ->
+init({Devname, Address, MaxBlockSize}) ->
     Port = ale_util:open_port(["i2c",
                                "/dev/" ++ Devname,
-                               integer_to_list(Address)]),
+                               integer_to_list(Address),
+                               integer_to_list(MaxBlockSize)]),
     {ok, Port}.
 
 %%--------------------------------------------------------------------
@@ -97,8 +105,8 @@ init({Devname, Address}) ->
 %%                                   {reply, Reply, State, Timeout} |
 %%                                   {noreply, State} |
 %%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
+%%                                   {stop, term(), Reply, State} |
+%%                                   {stop, term(), State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({write, Data}, _From, State) ->
@@ -120,7 +128,7 @@ handle_call({wrrd, Data, Len}, _From, State) ->
 %%
 %% @spec handle_cast(Msg, State) -> {noreply, State} |
 %%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
+%%                                  {stop, term(), State}
 %% @end
 %%--------------------------------------------------------------------
 
@@ -134,7 +142,7 @@ handle_cast(stop, State) ->
 %%
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
+%%                                   {stop, term(), State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(_Info, State) ->
