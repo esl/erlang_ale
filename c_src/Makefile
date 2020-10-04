@@ -21,7 +21,9 @@ CXXFLAGS ?= -O3 -finline-functions -Wall
 CFLAGS += -I $(ERTS_INCLUDE_DIR) -I $(ERL_INTERFACE_INCLUDE_DIR)
 CXXFLAGS += -I $(ERTS_INCLUDE_DIR) -I $(ERL_INTERFACE_INCLUDE_DIR)
 
-LDLIBS += -L $(ERL_INTERFACE_LIB_DIR) -lerl_interface -lei
+# Note: Remove -lerl_interface from the default LDLIBS.
+#       The -lerl_interface library is getting removed in OTP-23.
+LDLIBS += -L $(ERL_INTERFACE_LIB_DIR) -lei
 LDFLAGS +=
 
 # Verbosity.
